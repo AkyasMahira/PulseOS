@@ -1,27 +1,27 @@
 import { create } from 'zustand'
 import type {
-  SystemSnapshot, ContainerMetric, ServiceStatus, ProcessInfo, AlertEvent
+  SystemSnapshot, ContainerMetric, ServiceStatus, ProcessInfo, AlertEvent, PageId
 } from '@pulseos/types'
 
 interface MetricsStore {
-  // Connection state
   connected: boolean
   setConnected: (v: boolean) => void
 
-  // Live data
   snapshot: SystemSnapshot | null
   containers: ContainerMetric[]
   services: ServiceStatus[]
   processes: ProcessInfo[]
   alerts: AlertEvent[]
 
-  // CPU/Mem/Net history (last 60 points)
   cpuHistory: number[]
   memHistory: number[]
   netRxHistory: number[]
   netTxHistory: number[]
 
-  // Actions
+  // Navigation
+  currentPage: PageId
+  setPage: (p: PageId) => void
+
   setSnapshot: (s: SystemSnapshot) => void
   setContainers: (c: ContainerMetric[]) => void
   setServices: (s: ServiceStatus[]) => void
@@ -51,6 +51,9 @@ export const useMetricsStore = create<MetricsStore>((set) => ({
   netRxHistory: [],
   netTxHistory: [],
 
+  currentPage: 'overview',
+  setPage: (p) => set({ currentPage: p }),
+
   setSnapshot: (snapshot) =>
     set((s) => ({
       snapshot,
@@ -68,7 +71,6 @@ export const useMetricsStore = create<MetricsStore>((set) => ({
     set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 100) })),
 }))
 
-// Auth store
 interface AuthStore {
   token: string | null
   username: string | null

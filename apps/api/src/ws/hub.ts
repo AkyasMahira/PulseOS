@@ -1,97 +1,99 @@
-import { Server as SocketServer } from 'socket.io'
-import type { Server as HttpServer } from 'http'
-import { collectAll } from '../collectors/index.js'
-import { insertMetric, pruneOldMetrics } from '../db/index.js'
-import { evaluateAlerts, onAlert } from '../alerts.js'
-import type { AlertEvent } from '@pulseos/types'
+import { Server as SocketServer } from "socket.io";
+import type { Server as HttpServer } from "http";
+import jwt from "jsonwebtoken";
+import { collectAll } from "../collectors/index.js";
+import { insertMetric, pruneOldMetrics } from "../db/index.js";
+import { evaluateAlerts, onAlert } from "../alerts.js";
+import type { AlertEvent } from "@pulseos/types";
 
-const INTERVAL = parseInt(process.env.COLLECT_INTERVAL_MS ?? '5000')
+const INTERVAL = parseInt(process.env.COLLECT_INTERVAL_MS ?? "5000");
 
-let io: SocketServer | null = null
-let timer: ReturnType<typeof setInterval> | null = null
-let pruneTimer: ReturnType<typeof setInterval> | null = null
+let io: SocketServer | null = null;
+let timer: ReturnType<typeof setInterval> | null = null;
+let pruneTimer: ReturnType<typeof setInterval> | null = null;
 
 export function createSocketServer(httpServer: HttpServer, jwtSecret: string) {
   io = new SocketServer(httpServer, {
-    cors: { origin: process.env.WEB_ORIGIN ?? 'http://localhost:4321', credentials: true },
-    path: '/ws',
-    transports: ['websocket', 'polling'],
-  })
+    cors: {
+      origin: process.env.WEB_ORIGIN ?? "http://localhost:4321",
+      credentials: true,
+    },
+    path: "/ws",
+    transports: ["websocket", "polling"],
+  });
 
-  // Auth middleware
-  io.use(async (socket, next) => {
-    const token = socket.handshake.auth?.token as string | undefined
-    if (!token) return next(new Error('unauthorized'))
-
+  // Auth middleware — synchronous JWT verify
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token as string | undefined;
+    if (!token) return next(new Error("unauthorized"));
     try {
-      const { verify } = await import('jsonwebtoken')
-      verify(token, jwtSecret)
-      next()
+      jwt.verify(token, jwtSecret);
+      next();
     } catch {
-      next(new Error('unauthorized'))
+      next(new Error("unauthorized"));
     }
-  })
+  });
 
-  io.on('connection', (socket) => {
-    console.log(`[ws] client connected: ${socket.id}`)
+  io.on("connection", (socket) => {
+    console.log(`[ws] client connected: ${socket.id}`);
 
-    socket.on('subscribe', ({ channels }: { channels: string[] }) => {
-      channels.forEach(ch => socket.join(ch))
-    })
+    socket.on("subscribe", ({ channels }: { channels: string[] }) => {
+      channels.forEach((ch) => socket.join(ch));
+    });
 
-    socket.on('unsubscribe', ({ channels }: { channels: string[] }) => {
-      channels.forEach(ch => socket.leave(ch))
-    })
+    socket.on("unsubscribe", ({ channels }: { channels: string[] }) => {
+      channels.forEach((ch) => socket.leave(ch));
+    });
 
-    socket.on('disconnect', () => {
-      console.log(`[ws] client disconnected: ${socket.id}`)
-    })
-  })
+    socket.on("disconnect", () => {
+      console.log(`[ws] client disconnected: ${socket.id}`);
+    });
+  });
 
   // Forward alerts to connected clients
   onAlert((event: AlertEvent) => {
-    io?.emit('alert:fired', event)
-  })
+    io?.emit("alert:fired", event);
+  });
 
-  startCollection()
-  return io
+  startCollection();
+  return io;
 }
 
 function startCollection() {
-  // Run once immediately
-  tick()
-
-  timer = setInterval(tick, INTERVAL)
-
-  // Prune old data daily
+  tick();
+  timer = setInterval(tick, INTERVAL);
   pruneTimer = setInterval(() => {
-    pruneOldMetrics(parseInt(process.env.HISTORY_RETENTION_DAYS ?? '30'))
-  }, 86_400_000)
+    pruneOldMetrics(parseInt(process.env.HISTORY_RETENTION_DAYS ?? "30"));
+  }, 86_400_000);
 }
 
 async function tick() {
   try {
-    const { snapshot, containers, services, processes } = await collectAll()
+    const { snapshot, containers, services, processes } = await collectAll();
 
-    // Persist to SQLite
-    const netRx = snapshot.net.reduce((a, n) => a + n.rxBytes, 0)
-    const netTx = snapshot.net.reduce((a, n) => a + n.txBytes, 0)
-    insertMetric(snapshot.timestamp, snapshot.cpu.usage, snapshot.mem.used, snapshot.mem.total, netRx, netTx)
+    const netRx = snapshot.net.reduce((a, n) => a + n.rxBytes, 0);
+    const netTx = snapshot.net.reduce((a, n) => a + n.txBytes, 0);
+    insertMetric(
+      snapshot.timestamp,
+      snapshot.cpu.usage,
+      snapshot.mem.used,
+      snapshot.mem.total,
+      netRx,
+      netTx,
+    );
 
-    // Evaluate alert rules
-    await evaluateAlerts(snapshot, services)
+    await evaluateAlerts(snapshot, services);
 
-    // Broadcast to all subscribed clients
-    io?.emit('metrics:snapshot', snapshot)
-    io?.emit('metrics:containers', containers)
-    io?.emit('metrics:services', services)
-    io?.emit('metrics:processes', processes)
+    io?.emit("metrics:snapshot", snapshot);
+    io?.emit("metrics:containers", containers);
+    io?.emit("metrics:services", services);
+    io?.emit("metrics:processes", processes);
   } catch (e) {
-    console.error('[collector] tick error:', e)
+    console.error("[collector] tick error:", e);
   }
 }
 
 export function stopCollection() {
-  if (timer) clearInterval(timer)
-  if (pruneTimer) clearInterval(pruneTimer)
+  if (timer) clearInterval(timer);
+  if (pruneTimer) clearInterval(pruneTimer);
 }

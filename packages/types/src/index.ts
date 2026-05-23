@@ -143,3 +143,41 @@ export interface HistoryPoint {
   t: number
   v: number
 }
+
+// Docker container actions
+export type ContainerAction = 'start' | 'stop' | 'restart' | 'remove'
+
+export interface DockerActionRequest {
+  containerId: string
+  action: ContainerAction
+}
+
+// Public status page
+export interface StatusPageService {
+  name: string
+  status: 'operational' | 'degraded' | 'outage'
+  uptime7d: number  // percent
+  latencyMs?: number
+}
+
+export interface StatusPage {
+  title: string
+  description?: string
+  services: StatusPageService[]
+  incidents: { id: string; title: string; body: string; createdAt: number; resolvedAt?: number }[]
+  overallStatus: 'operational' | 'degraded' | 'outage'
+}
+
+// Multi-server
+export interface ServerConfig {
+  id: string
+  name: string
+  host: string
+  apiUrl: string
+  token?: string
+  tags: string[]
+  addedAt: number
+}
+
+// UI navigation state
+export type PageId = 'overview' | 'containers' | 'processes' | 'network' | 'alerts' | 'history' | 'settings'
