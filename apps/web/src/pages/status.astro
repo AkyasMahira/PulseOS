@@ -1,0 +1,107 @@
+---
+import '../../styles/global.css'
+const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:3001'
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Status</title>
+    <link rel="icon" href="/favicon.svg" />
+  </head>
+  <body class="bg-surface-0 text-slate-100 font-mono min-h-screen">
+    <div id="app" class="max-w-2xl mx-auto px-4 py-12">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-2 mb-3">
+          <div class="w-2 h-2 rounded-full bg-accent-green animate-pulse-slow"></div>
+          <span class="text-lg font-bold tracking-widest">PULSE<span style="color:#3b82f6">OS</span></span>
+        </div>
+        <h1 id="page-title" class="text-2xl font-bold text-slate-100 mb-2">System Status</h1>
+        <p id="page-desc" class="text-slate-500 text-sm"></p>
+      </div>
+
+      <div id="overall" class="mb-8 flex justify-center">
+        <div id="overall-pill" class="px-5 py-2 rounded-full border text-sm font-semibold">Loading...</div>
+      </div>
+
+      <div id="services" class="bg-surface-2 border border-surface-border rounded-xl overflow-hidden mb-8">
+        <div class="px-4 py-3 border-b border-surface-border text-xs text-slate-500 uppercase tracking-widest">Services</div>
+        <div id="services-list" class="divide-y divide-surface-border">
+          <div class="px-4 py-3 text-slate-600 text-sm">Loading...</div>
+        </div>
+      </div>
+
+      <div id="incidents-wrap" class="hidden">
+        <div class="text-xs text-slate-500 uppercase tracking-widest mb-3 px-1">Recent Incidents</div>
+        <div id="incidents-list" class="flex flex-col gap-2"></div>
+      </div>
+
+      <div class="text-center text-xs text-slate-700 mt-8">
+        Auto-refreshes every 30s · Powered by PulseOS
+      </div>
+    </div>
+
+    <script define:vars={{ API_URL }}>
+      const STATUS_COLORS = {
+        operational: { pill: 'bg-green-950/50 border-green-900/40 text-green-400', dot: 'bg-green-500' },
+        degraded: { pill: 'bg-amber-950/50 border-amber-900/40 text-amber-400', dot: 'bg-amber-500' },
+        outage: { pill: 'bg-red-950/50 border-red-900/40 text-red-400', dot: 'bg-red-500' },
+      }
+
+      async function load() {
+        const res = await fetch(`${API_URL}/status`).catch(() => null)
+        if (!res?.ok) {
+          document.getElementById('overall-pill').textContent = 'Unable to fetch status'
+          return
+        }
+        const data = await res.json()
+
+        // Title
+        document.getElementById('page-title').textContent = data.title ?? 'System Status'
+        document.getElementById('page-desc').textContent = data.description ?? ''
+
+        // Overall
+        const ovStyle = STATUS_COLORS[data.overallStatus] ?? STATUS_COLORS.operational
+        const pill = document.getElementById('overall-pill')
+        pill.className = `px-5 py-2 rounded-full border text-sm font-semibold ${ovStyle.pill}`
+        pill.textContent = {
+          operational: '✓ All Systems Operational',
+          degraded: '⚠ Partial Degradation',
+          outage: '✕ Major Outage',
+        }[data.overallStatus] ?? data.overallStatus
+
+        // Services
+        const list = document.getElementById('services-list')
+        list.innerHTML = data.services.map(svc => {
+          const s = STATUS_COLORS[svc.status] ?? STATUS_COLORS.operational
+          return `<div class="flex items-center gap-3 px-4 py-3">
+            <div class="w-2 h-2 rounded-full flex-shrink-0 ${s.dot} shadow-[0_0_4px_currentColor]"></div>
+            <span class="text-slate-200 flex-1 text-sm">${svc.name}</span>
+            <span class="text-xs text-slate-500">${svc.uptime7d}% uptime</span>
+            <span class="text-xs px-2 py-0.5 rounded border ${s.pill}">${svc.status}</span>
+          </div>`
+        }).join('') || '<div class="px-4 py-3 text-slate-600 text-sm">No services</div>'
+
+        // Incidents
+        if (data.incidents?.length > 0) {
+          document.getElementById('incidents-wrap').classList.remove('hidden')
+          document.getElementById('incidents-list').innerHTML = data.incidents.map(inc => `
+            <div class="bg-surface-2 border border-surface-border rounded-lg px-4 py-3">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm text-slate-200">${inc.title}</span>
+                <span class="text-xs text-slate-600">${new Date(inc.createdAt).toLocaleDateString()}</span>
+              </div>
+              <p class="text-xs text-slate-500">${inc.body}</p>
+              ${inc.resolvedAt ? `<p class="text-xs text-green-500 mt-1">Resolved</p>` : '<p class="text-xs text-amber-500 mt-1">Ongoing</p>'}
+            </div>
+          `).join('')
+        }
+      }
+
+      load()
+      setInterval(load, 30000)
+    </script>
+  </body>
+</html>
