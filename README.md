@@ -1,120 +1,201 @@
-# PulseOS — Lightweight VPS Monitoring Dashboard
+# PulseOS
 
-> Realtime metrics for your VPS. Dark, minimal, terminal-inspired.
-> Stack: Fastify · Socket.IO · Astro · React · SQLite
+> Real-time infrastructure monitoring dashboard for Linux servers, containers, and services.
+> Lightweight, self-hosted, and built for modern VPS observability.
 
-## Architecture
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2f85ea00-1ac9-4a9a-9b59-449ffe4e2184" alt="PulseOS Dashboard" width="100%" />
+</p>
 
-```
+<p align="center">
+  <strong>Fastify</strong> · <strong>Socket.IO</strong> · <strong>Astro</strong> · <strong>React</strong> · <strong>SQLite</strong>
+</p>
+
+---
+
+## ✨ Features
+
+### Real-time Monitoring
+
+* Live CPU, RAM, Disk, and Network metrics
+* Process and service monitoring
+* Docker container tracking
+* Historical metrics & activity logs
+
+### Infrastructure Observability
+
+* WebSocket-based live telemetry
+* Lightweight `/proc` collectors
+* SQLite metrics persistence
+* Alert rules & monitoring system
+
+### Dashboard Experience
+
+* Modern dark UI
+* Responsive dashboard layout
+* Dedicated monitoring pages
+* Lightweight frontend architecture
+
+### Notifications & Alerts
+
+* Telegram alert integration
+* Discord webhook support
+* Service health monitoring
+
+---
+
+## 📸 Preview
+
+### Dashboard Overview
+
+<img width="2624" height="1448" alt="pulseos-dashboard" src="https://github.com/user-attachments/assets/2f85ea00-1ac9-4a9a-9b59-449ffe4e2184" />
+
+### Alerts & Monitoring Rules
+
+<img width="2624" height="1448" alt="pulseos-alerts" src="https://github.com/user-attachments/assets/b9bafd2c-59de-44d1-90bc-d51487486ddc" />
+
+### Container Monitoring
+
+<img width="2624" height="1448" alt="pulseos-container" src="https://github.com/user-attachments/assets/84674ae1-97ef-44b0-add6-ec7091e31385" />
+
+### Process Monitoring
+
+<img width="2624" height="1448" alt="pulseos-processes" src="https://github.com/user-attachments/assets/2c8efa3d-ba74-4e13-871f-435e971cbfe8" />
+
+### Network Monitoring
+
+<img width="2624" height="1448" alt="pulseos-network" src="https://github.com/user-attachments/assets/7a666c4b-a5a3-4820-acd6-a8a0077de536" />
+
+### Authentication
+
+<img width="2624" height="1530" alt="pulseos-login" src="https://github.com/user-attachments/assets/5a0e5714-dde9-407c-ad8a-23a7dcb273d5" />
+
+---
+
+## 🏗️ Architecture
+
+```text
 [ Linux /proc + Docker socket ]
-         ↓
-[ Fastify API + collectors ]  ← reads /proc/stat, /proc/meminfo, /proc/net/dev, df
-         ↓
-[ Socket.IO — broadcasts every 5s ]
-         ↓
-[ Astro + React dashboard ]
+                ↓
+[ Fastify API + Collectors ]
+                ↓
+[ Socket.IO Realtime Hub ]
+                ↓
+[ Astro + React Dashboard ]
 ```
 
-## Requirements
+PulseOS collects infrastructure telemetry directly from Linux system interfaces and streams them to the frontend using WebSockets for low-latency real-time updates.
 
-- Node.js 20+
-- Linux VPS (Ubuntu 22.04 recommended)
-- PM2 (`npm i -g pm2`)
-- nginx + certbot for production
+---
 
-## Quick Start
+## 🚀 Quick Start
+
+### Requirements
+
+* Node.js 20+
+* Linux VPS (Ubuntu 22.04 recommended)
+* PM2
+* nginx + certbot (production)
+
+### Installation
 
 ```bash
-git clone <repo> pulseos && cd pulseos
+git clone <repo> pulseos
+cd pulseos
 
-# Install all workspace deps
 npm install
 
-# Copy env and configure
 cp apps/api/.env.example apps/api/.env
-nano apps/api/.env        # set JWT_SECRET, ADMIN_USER, ADMIN_PASS
+nano apps/api/.env
 
-# Dev mode (API + web in parallel)
 npm run dev
-# API  → http://localhost:3001
-# Web  → http://localhost:4321
 ```
 
-## Environment Variables (apps/api/.env)
+### Development URLs
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3001` | API port |
-| `JWT_SECRET` | *(required)* | Long random string |
-| `ADMIN_USER` | `admin` | Initial admin username |
-| `ADMIN_PASS` | `changeme` | Initial admin password (min 8 chars) |
-| `COLLECT_INTERVAL_MS` | `5000` | Metrics collection interval |
-| `WATCH_SERVICES` | `nginx,ssh,cron` | Comma-separated systemd services to monitor |
-| `WATCH_PM2` | `true` | Monitor PM2 processes |
-| `DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
-| `HISTORY_RETENTION_DAYS` | `30` | SQLite data retention |
-| `TELEGRAM_BOT_TOKEN` | *(optional)* | Telegram bot for alerts |
-| `TELEGRAM_CHAT_ID` | *(optional)* | Telegram chat/channel ID |
-| `DISCORD_WEBHOOK_URL` | *(optional)* | Discord webhook for alerts |
-| `WEB_ORIGIN` | `http://localhost:4321` | CORS allowed origin |
+| Service   | URL                     |
+| --------- | ----------------------- |
+| API       | `http://localhost:3001` |
+| Dashboard | `http://localhost:4321` |
 
-## Production Deploy
+---
 
-```bash
-# 1. Install certbot & get SSL cert
-sudo certbot --nginx -d your-domain.com
+## ⚙️ Environment Variables
 
-# 2. Update nginx.conf with your domain
-sed -i 's/your-domain.com/yourdomain.com/g' nginx.conf
+Location: `apps/api/.env`
 
-# 3. Build & deploy
-chmod +x deploy.sh && ./deploy.sh
-```
+| Variable                 | Description                 |
+| ------------------------ | --------------------------- |
+| `PORT`                   | API port                    |
+| `JWT_SECRET`             | Authentication secret       |
+| `ADMIN_USER`             | Initial admin username      |
+| `ADMIN_PASS`             | Initial admin password      |
+| `COLLECT_INTERVAL_MS`    | Metrics collection interval |
+| `WATCH_SERVICES`         | Services to monitor         |
+| `WATCH_PM2`              | Monitor PM2 processes       |
+| `DOCKER_SOCKET`          | Docker socket path          |
+| `HISTORY_RETENTION_DAYS` | Metrics retention           |
+| `TELEGRAM_BOT_TOKEN`     | Telegram integration        |
+| `TELEGRAM_CHAT_ID`       | Telegram target             |
+| `DISCORD_WEBHOOK_URL`    | Discord alerts              |
+| `WEB_ORIGIN`             | Allowed frontend origin     |
 
-## Folder Structure
+---
 
-```
+## 📦 Project Structure
+
+```text
 pulseos/
 ├── apps/
-│   ├── api/                    # Fastify backend
-│   │   └── src/
-│   │       ├── collectors/     # /proc readers + Docker + services
-│   │       │   ├── cpu.ts      # /proc/stat → CPU usage
-│   │       │   ├── mem.ts      # /proc/meminfo → RAM usage
-│   │       │   ├── disk.ts     # df → disk usage
-│   │       │   ├── net.ts      # /proc/net/dev → bandwidth
-│   │       │   ├── docker.ts   # Docker socket API
-│   │       │   ├── services.ts # systemd + PM2
-│   │       │   ├── processes.ts # /proc/{pid} top processes
-│   │       │   └── index.ts    # collectAll() orchestrator
-│   │       ├── db/             # SQLite (better-sqlite3)
-│   │       ├── routes/         # REST: /api/auth, /api/metrics
-│   │       ├── ws/hub.ts       # Socket.IO broadcaster
-│   │       ├── alerts.ts       # Alert engine + Telegram/Discord
-│   │       └── index.ts        # Fastify bootstrap
-│   └── web/                    # Astro + React frontend
-│       └── src/
-│           ├── components/
-│           │   ├── dashboard/  # MetricCard, Dashboard, LoginPage
-│           │   ├── charts/     # SparkLine (Recharts)
-│           │   └── services/   # ServicesTable, ProcessTable
-│           ├── stores/         # Zustand (metrics + auth)
-│           ├── hooks/          # useSocket (Socket.IO client)
-│           └── lib/utils.ts    # fmtBytes, fmtUptime, etc.
-└── packages/
-    └── types/                  # Shared TypeScript interfaces
+│   ├── api/         # Fastify backend + collectors
+│   └── web/         # Astro + React frontend
+├── packages/
+│   └── types/       # Shared TypeScript types
+└── deploy.sh
 ```
 
-## Resource Usage
+---
 
-Target on a 2 vCPU / 2GB VPS:
-- **API idle**: ~40MB RAM, <0.5% CPU
-- **Collection spike** (5s): <1% CPU burst
-- **SQLite**: ~1MB/day at 5s intervals
+## 🧠 Resource Usage
 
-## Roadmap
+Target usage on a 2 vCPU / 2GB VPS:
 
-- [x] Phase 1 — System metrics + realtime dashboard + SQLite
-- [ ] Phase 2 — Docker monitoring + alerts + history charts  
-- [ ] Phase 3 — Multi-server + public status page + team accounts
-- [ ] Phase 4 — SaaS deployment + billing
+| Component     | Usage    |
+| ------------- | -------- |
+| API idle RAM  | ~40MB    |
+| CPU usage     | <1%      |
+| SQLite growth | ~1MB/day |
+
+Designed to stay lightweight even on low-resource VPS environments.
+
+---
+
+## 🛣️ Roadmap
+
+* [x] Realtime infrastructure monitoring
+* [x] Docker tracking & metrics history
+* [x] Alert rules & notifications
+* [ ] Multi-server management
+* [ ] Public status pages
+* [ ] Team accounts & RBAC
+* [ ] SaaS deployment platform
+* [ ] Billing & subscription system
+
+---
+
+## 🧩 Philosophy
+
+PulseOS focuses on:
+
+* lightweight infrastructure monitoring
+* realtime observability
+* self-hosted simplicity
+* minimal operational overhead
+
+Built for developers who want modern monitoring without heavyweight enterprise stacks.
+
+---
+
+## 📄 License
+
+MIT License
