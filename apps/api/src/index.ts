@@ -6,6 +6,8 @@ import FastifyJwt from '@fastify/jwt'
 import FastifyRateLimit from '@fastify/rate-limit'
 import { authRoutes } from './routes/auth.js'
 import { metricsRoutes, alertRoutes } from './routes/metrics.js'
+import { dockerRoutes } from './routes/docker.js'
+import { statusRoutes } from './routes/status.js'
 import { createSocketServer } from './ws/hub.js'
 import { getDb, insertUser, userCount } from './db/index.js'
 import bcrypt from 'bcryptjs'
@@ -47,6 +49,8 @@ async function bootstrap() {
   await app.register(authRoutes, { prefix: '/api/auth' })
   await app.register(metricsRoutes, { prefix: '/api/metrics' })
   await app.register(alertRoutes, { prefix: '/api/alerts' })
+  await app.register(dockerRoutes, { prefix: '/api/docker' })
+  await app.register(statusRoutes, { prefix: '/status' })
 
   // Health check
   app.get('/health', async () => ({ ok: true, ts: Date.now() }))
