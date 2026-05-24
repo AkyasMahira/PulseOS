@@ -23,8 +23,8 @@
 
 <p align="center">
   <img
-    src="https://github.com/user-attachments/assets/2f85ea00-1ac9-4a9a-9b59-449ffe4e2184"
-    alt="PulseOS Dashboard"
+    src="https://github.com/user-attachments/assets/8524f18c-c6e0-4214-9399-ec1f431804b7"
+    alt="PulseOS Banner"
     width="100%"
   />
 </p>
