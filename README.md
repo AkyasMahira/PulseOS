@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/license/AkyasMahira/pulseos?style=for-the-badge&color=22c55e" />
+  <img src="https://img.shields.io/github/license/AkyasMahira/pulseos" />
   <img src="https://img.shields.io/github/package-json/v/AkyasMahira/pulseos?style=for-the-badge&color=f59e0b" />
 </p>
 
