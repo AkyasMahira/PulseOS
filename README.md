@@ -9,13 +9,15 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/license/AkyasMahira/pulseos" />
-  <img src="https://img.shields.io/github/package-json/v/AkyasMahira/pulseos?style=for-the-badge&color=f59e0b" />
+  <img src="https://img.shields.io/github/license/AkyasMahira/pulseos?style=for-the-badge" />
+  <img src="https://img.shields.io/github/package-json/v/AkyasMahira/pulseos?style=for-the-badge" />
+  <img src="https://img.shields.io/github/stars/AkyasMahira/pulseos?style=for-the-badge" />
+  <img src="https://img.shields.io/github/last-commit/AkyasMahira/pulseos?style=for-the-badge" />
 </p>
 
 <p align="center">
   <a href="https://github.com/AkyasMahira/pulseos/stargazers">
-    <img src="https://img.shields.io/badge/follow-github-181717?style=for-the-badge&logo=github" />
+    <img src="https://img.shields.io/github/stars/AkyasMahira/pulseos?style=for-the-badge&logo=github" />
   </a>
   <a href="https://t.me/tunamsam">
     <img src="https://img.shields.io/badge/chat-telegram-26A5E4?style=for-the-badge&logo=telegram" />
