@@ -9,17 +9,15 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/stars/AkyasMahira/pulseos?style=for-the-badge&color=0ea5e9" />
   <img src="https://img.shields.io/github/license/AkyasMahira/pulseos?style=for-the-badge&color=22c55e" />
   <img src="https://img.shields.io/github/package-json/v/AkyasMahira/pulseos?style=for-the-badge&color=f59e0b" />
-  <img src="https://img.shields.io/github/commit-activity/m/AkyasMahira/pulseos?style=for-the-badge&color=8b5cf6" />
 </p>
 
 <p align="center">
   <a href="https://github.com/AkyasMahira/pulseos/stargazers">
     <img src="https://img.shields.io/badge/follow-github-181717?style=for-the-badge&logo=github" />
   </a>
-  <a href="https://t.me/YOUR_TELEGRAM">
+  <a href="https://t.me/tunamsam">
     <img src="https://img.shields.io/badge/chat-telegram-26A5E4?style=for-the-badge&logo=telegram" />
   </a>
 </p>
@@ -27,10 +25,12 @@
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2f85ea00-1ac9-4a9a-9b59-449ffe4e2184" alt="PulseOS Dashboard" width="100%" />
+  <img
+    src="https://github.com/user-attachments/assets/2f85ea00-1ac9-4a9a-9b59-449ffe4e2184"
+    alt="PulseOS Dashboard"
+    width="100%"
+  />
 </p>
-
----
 
 <p align="center">
   <strong>Fastify</strong> · <strong>Socket.IO</strong> · <strong>Astro</strong> · <strong>React</strong> · <strong>SQLite</strong>
@@ -125,7 +125,7 @@ PulseOS collects infrastructure telemetry directly from Linux system interfaces 
 ### Installation
 
 ```bash
-git clone <repo> pulseos
+git clone https://github.com/AkyasMahira/pulseos.git
 cd pulseos
 
 npm install
