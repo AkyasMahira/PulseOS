@@ -27,10 +27,11 @@
 | V1-04 | Alert auto-resolution | S | 🟡 Important | `alerts.ts`, `db/index.ts` | Track active rule IDs; UPDATE `resolved_at` when rule stops firing |
 | V1-05 | Disk history writes | S | 🟡 Important | `ws/hub.ts`, `db/index.ts` | `insertDiskHistory()` + call in `tick()` for each disk |
 | V1-06 | Alert cooldown persistence | S | 🟡 Important | `alerts.ts`, `db/index.ts` | Persist `last_fired_at` to `alert_rules` table to survive restarts |
-| V1-07 | Mobile sidebar drawer | S | 🟢 Nice-to-have | `Dashboard.tsx`, `Sidebar.tsx` | `mobileMenuOpen` state exists; wire hamburger toggle for `<lg` screens |
-| V1-08 | Audit log for destructive actions | M | 🟢 Nice-to-have | All route files | Log container actions, user deletion, role changes, invite creation |
+| V1-07 | API key hashing | S | 🔴 Critical | `db/index.ts`, `middleware/auth.ts`, `routes/apikeys.ts` | Hash keys with `sha256` before storing in `key_hash`; update `requireApiKey` to compare hash |
+| V1-08 | Mobile sidebar drawer | S | 🟢 Nice-to-have | `Dashboard.tsx`, `Sidebar.tsx` | `mobileMenuOpen` state exists; wire hamburger toggle for `<lg` screens |
+| V1-09 | Audit log for destructive actions | M | 🟢 Nice-to-have | All route files | Log container actions, user deletion, role changes, invite creation |
 
-**Total estimate**: ~8-12 hours for the full sprint. V1-01 through V1-04 alone (~3 hours) are sufficient for a minimal production-ready release.
+**Total estimate**: ~8-12 hours for the full sprint. V1-01 through V1-07 alone (~6 hours) cover all critical security and correctness issues for a production-ready release.
 
 ---
 
