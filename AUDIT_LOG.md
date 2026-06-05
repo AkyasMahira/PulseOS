@@ -16,15 +16,16 @@
 - **Fix Required**: When implementing, use `stripe` npm package with `webhooks.constructEvent()` and register `@fastify/rawbody` plugin.
 
 ### C-02 — API Keys Stored as Plaintext
-- **Status**: Planned — API key infrastructure exists (table + CRUD functions), but no route handlers exist. `createApiKey()` stores `key_hash` directly without hashing.
-- **Risk**: When API key routes are implemented (Phase 3D), keys will be stored in plaintext unless `createApiKey()` is updated to hash before storage.
-- **File**: `apps/api/src/db/index.ts:314-322`
-- **Fix Required**: When implementing routes, pass `sha256(key)` to `createApiKey()` `keyHash` parameter.
+- **Status**: ❌ Not Fixed — keys are still stored as plaintext
+- **Risk**: `createApiKey()` in `routes/apikeys.ts` stores the raw key in `key_hash` column. `requireApiKey` middleware compares the `x-api-key` header directly against the stored value.
+- **File**: `apps/api/src/db/index.ts:314-322`, `apps/api/src/middleware/auth.ts:52-53`
+- **Fix Required**: Hash the key with `sha256(key)` before storing in `key_hash`. Update `requireApiKey` to compare `sha256(x-api-key)` against the stored hash.
 
 ### C-03 — API Keys Not Used for Authentication
-- **Status**: Planned — API key infrastructure exists (table + CRUD functions), but no auth middleware checks `x-api-key` header.
-- **Risk**: Not yet applicable — no API key endpoints exposed (planned for Phase 3D).
-- **Fix Required**: When implementing, add `x-api-key` header check to auth middleware.
+- **Status**: ✅ Fixed
+- **Risk**: Not applicable — resolved in Phase 3D.
+- **File**: `apps/api/src/middleware/auth.ts:48-62`
+- **Evidence**: `requireApiKey` middleware validates `x-api-key` header against `api_keys` table, touches `last_used_at`.
 
 ---
 
@@ -47,10 +48,10 @@
 - **Fix Required**: In `tick()` or `evaluateAlerts()`, track which rule IDs are currently firing. When a rule no longer triggers, UPDATE `alert_events SET resolved_at = ? WHERE rule_id = ? AND resolved_at IS NULL`.
 
 ### H-02 — Webhook Delivery Never Triggered
-- **Status**: Planned — feature does not exist yet
-- **Risk**: Not yet applicable — webhooks table and CRUD routes are planned for Phase 3.
-- **Files**: N/A (routes/apikeys.ts does not exist)
-- **Fix Required**: When implementing Phase 3, call `listWebhooks()` in `fireAlert()` with HMAC signature.
+- **Status**: ✅ Fixed
+- **Risk**: Not applicable — resolved in Phase 3D.
+- **Files**: `apps/api/src/alerts.ts:82-104`
+- **Evidence**: `fireAlert()` calls `listWebhooks()`, filters by enabled + event match, dispatches via `fetch()` to each webhook URL with `X-Webhook-Secret` header.
 
 ### H-03 — Plan Limits Not Enforced Server-Side
 - **Status**: Planned — feature does not exist yet
@@ -70,10 +71,10 @@
 - **Fix Required**: Add `insertDiskHistory()` function in `db/index.ts` and call it in `ws/hub.ts:tick()` for each disk in `snapshot.disks`.
 
 ### H-06 — Remote Server API Tokens (Security Issue)
-- **Status**: ⚠️ Needs Verification — DB infrastructure exists, routes not yet implemented
-- **Risk**: `listServers()` in `db/index.ts:292` returns `apiToken` directly. When server routes are implemented (Phase 3C), this function must NOT be called directly from a GET endpoint.
-- **Files**: `db/index.ts:282-310`, `packages/types/src/index.ts` (ServerConfig.apiToken is required, not optional)
-- **Fix Required**: When implementing routes, create a response DTO that omits `apiToken`. Never call `listServers()` from an API response handler without stripping the token.
+- **Status**: ✅ Fixed
+- **Risk**: Not applicable — resolved in Phase 3C.
+- **Files**: `apps/api/src/routes/servers.ts:10-13`
+- **Evidence**: `stripToken()` function destructures `apiToken` out of `ServerConfig`. All GET responses use `stripToken()` to return `Omit<ServerConfig, 'apiToken'>`. Token never exposed to clients.
 
 ---
 
@@ -131,9 +132,9 @@
 ---
 
 ### L-01 — `getUserById` Function Defined But Never Called
-- **Status**: Pending (will be used in Phase 3B team routes)
-- **File**: `apps/api/src/db/index.ts:209`
-- **Fix**: Use in team routes (e.g., to fetch user after accept-invite). Currently only called through planned `routes/team.ts`.
+- **Status**: ✅ Fixed
+- **File**: `apps/api/src/db/index.ts:209` (defined), `apps/api/src/routes/team.ts:34-35` (called)
+- **Evidence**: `getUserById()` is called in `PUT /api/team/users/:id/role` and `DELETE /api/team/users/:id` to validate user existence before mutation.
 
 ### L-02 — `HistoryQuery` Interface Defined But Never Used
 - **Status**: Pending

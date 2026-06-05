@@ -29,27 +29,27 @@
 
 ---
 
-## 2. Role-Based Access Control (🚧 Phase 3A — foundation implemented)
+## 2. Role-Based Access Control (✅ Phase 3 — fully implemented)
 
 ### BR-RBAC-01 — Role Hierarchy
-- **Status**: 🚧 Partially Implemented
+- **Status**: ✅ Implemented
 - Three roles: `owner` > `admin` > `viewer`.
 - Roles stored in `users.role` column (TEXT, default `'admin'`).
 - Role embedded in JWT `{ sub, username, role }` claim.
 - Middleware: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only).
+- Route enforcement (Phase 3E): container mutations and alert rule creation require `requireAdmin`.
 - Frontend sidebar filters nav items by `requireRole` array — `servers`, `team`, `apikeys` hidden from viewers.
-- `viewer`: Read-only. Can view all dashboards. Cannot perform actions (container restart, alerts, team management). ⚠️ Route-level enforcement not yet applied to most API endpoints.
-- `admin`: Can perform all monitoring actions. Can invite users (viewer or admin role only). Cannot access billing. Cannot delete owner.
-- `owner`: Full access including billing, team management, deleting users, assigning any role.
+- `viewer`: Read-only. Can view all dashboards and container logs. Cannot restart/remove containers, create alert rules, manage team, or access servers/apikeys/team API endpoints.
+- `admin`: Can perform all monitoring actions, container mutations, invite users (viewer or admin only), manage alerts. Cannot access billing or delete owner.
+- `owner`: Full access including team management, deleting users, assigning any role.
 
 ### BR-RBAC-02 — Role Assignment Constraints
-- **Status**: 🚧 Partially Implemented
-- `updateUserRole(id, role)` and `deleteUser(id)` exist in `db/index.ts`.
-- ⚠️ No route handlers call these functions yet — team management UI and API routes are planned for Phase 3B.
-- Only `owner` can change user roles (enforced via `requireOwner` middleware when route is implemented).
-- Only `owner` can delete users.
-- `owner` cannot delete themselves.
-- `admin` can only invite users with role `viewer` or `admin` (not `owner`).
+- **Status**: ✅ Implemented
+- `PUT /api/team/users/:id/role` gated behind `requireOwner`. Only owner can change user roles.
+- `DELETE /api/team/users/:id` gated behind `requireOwner`. Only owner can delete users.
+- Owner cannot delete themselves (enforced server-side).
+- Owner cannot change their own role (enforced server-side).
+- `POST /api/team/invites` only allows invite roles `viewer` or `admin` (not `owner`). Enforced server-side.
 - There is no restriction on multiple owners (any owner can promote another user to owner).
 
 ### BR-RBAC-03 — Billing Page Visibility
@@ -59,21 +59,21 @@
 
 ---
 
-## 3. Team Invite Rules (🚧 Phase 3A — DB layer implemented)
+## 3. Team Invite Rules (✅ Phase 3B — fully implemented)
 
 ### BR-TEAM-01 — Invite Lifecycle
-- **Status**: 🚧 Partially Implemented
-- `invites` table and CRUD functions (`createInvite`, `getInviteByToken`, `listInvites`, `deleteInvite`) exist in `db/index.ts`.
-- ⚠️ No route handler or accept-invite page exists yet. Route handlers planned for Phase 3B.
+- **Status**: ✅ Implemented
+- `routes/team.ts` provides full CRUD for invites. `POST /api/team/invites` creates invite (admin-gated). `DELETE /api/team/invites/:id` revokes (admin-gated).
+- `accept-invite.astro` page validates token via `GET /api/team/invite-info`.
+- `POST /api/team/accept-invite` creates user account and deletes invite.
 - Invite token is valid for **48 hours** from creation.
 - Tokens are UUID-based (32 hex characters after dashes stripped).
 - Expired invites are automatically excluded from `listInvites()` query.
-- Accepting an invite deletes the invite record from the table.
 - Each invite is for a specific email address.
 
 ### BR-TEAM-02 — Invite Delivery
-- **Status**: 📋 Planned
-- The API returns the invite URL in the response body.
+- **Status**: 🚧 Partially Implemented
+- The API returns the invite URL in the response body (`inviteUrl` field).
 - Email sending requires nodemailer/SMTP integration.
 
 ---
@@ -94,11 +94,12 @@
 - On API restart, all cooldowns reset to zero.
 
 ### BR-ALERT-03 — Alert Channels
-- **Status**: Partial
+- **Status**: ✅ Implemented (enhanced in Phase 3D)
 - `telegram`: Implemented via direct `fetch()` to Bot API.
 - `discord`: Implemented via webhook URL.
+- `webhook`: Implemented via `fireAlert()` calling `listWebhooks()`. Dispatches to all enabled webhooks subscribed to `alert:fired` event. Includes `X-Webhook-Secret` header.
 - `email`: Defined in `AlertChannel` type but not implemented in dispatch logic.
-- Channels are stored as a JSON array per rule.
+- Channels are stored as a JSON array per rule. Webhooks use the separate `webhooks` table.
 
 ### BR-ALERT-04 — Alert Resolution
 - **Status**: Not Implemented
@@ -130,9 +131,16 @@
 - Logs include both stdout and stderr (`stdout=1&stderr=1`).
 - Raw Docker multiplexed stream is returned — 8-byte frame headers are not stripped (known issue L-08).
 
+### BR-DOCKER-03 — RBAC on Container Actions
+- **Status**: ✅ Implemented (Phase 3E)
+- `POST /:id/:action` (start, stop, restart, pause, unpause): requires `requireAdmin` (owner or admin).
+- `DELETE /:id` (remove container): requires `requireAdmin`.
+- `GET /` (list containers) and `GET /:id/logs`: requires `requireAuth` (any authenticated user, including viewers).
+- Viewers can monitor containers but cannot perform destructive actions.
+
 ---
 
-## 6. Multi-Server Rules (🚧 Phase 3A — DB layer implemented)
+## 6. Multi-Server Rules (✅ Phase 3C — fully implemented)
 
 ### BR-SERVER-01 — Local Server
 - **Status**: ✅ Implemented
@@ -140,16 +148,17 @@
 - It is represented with `id: 'local'` in the frontend but is not stored in the `servers` table.
 
 ### BR-SERVER-02 — Remote Servers
-- **Status**: 🚧 Partially Implemented
-- `servers` table and CRUD functions (`addServer`, `listServers`, `getServer`, `removeServer`) exist in `db/index.ts`.
-- ⚠️ No route handler or polling loop exists yet. Route handlers planned for Phase 3C.
-- Remote servers will be polled via HTTP GET to `{apiUrl}/api/metrics/now`.
+- **Status**: ✅ Implemented
+- `routes/servers.ts` provides full CRUD for remote servers (admin-gated).
+- `startRemotePolling()` polls all servers via HTTP GET to `{apiUrl}/api/metrics/now` every `COLLECT_INTERVAL_MS`.
 - Authentication uses the stored `apiToken` as a Bearer token.
-- Poll interval matches `COLLECT_INTERVAL_MS`.
+- Results cached in `remoteCache` Map (in-memory, resets on restart).
 
 ### BR-SERVER-03 — API Token Security
-- **Status**: 🚧 Partially Implemented
-- ⚠️ `listServers()` returns `apiToken` directly. When route handlers are implemented, `apiToken` must be stripped from responses. The `ServerConfig` type has `apiToken: string` (not optional) — routes must never expose this field to clients.
+- **Status**: ✅ Implemented
+- `routes/servers.ts:10` — `stripToken()` function removes `apiToken` from all GET responses.
+- The `ServerConfig` type has `apiToken: string` (required), but the route returns `Omit<ServerConfig, 'apiToken'>` to clients.
+- Token is never exposed in frontend bundle or API responses.
 
 ---
 
@@ -169,22 +178,23 @@
 
 ---
 
-## 8. API Key Rules (🚧 Phase 3A — DB layer implemented)
+## 8. API Key Rules (✅ Phase 3D — fully implemented)
 
 ### BR-APIKEY-01 — Key Lifecycle
-- **Status**: 🚧 Partially Implemented
-- `api_keys` table and CRUD functions (`createApiKey`, `listApiKeys`, `getApiKeyByHash`, `touchApiKey`, `revokeApiKey`) exist in `db/index.ts`.
-- ⚠️ No route handler or `x-api-key` middleware exists yet. Route handlers planned for Phase 3D.
-- Keys with `pk_` prefix, 32 hex characters.
-- Full key returned once at creation, never again.
-- `prefix` (first 10 chars) for display.
+- **Status**: ✅ Implemented
+- `routes/apikeys.ts` provides full CRUD for API keys (admin-gated).
+- Keys generated as `{prefix}{32-hex-uuid}`. Default prefix: `pk_`.
+- Full key returned once at creation — stored in API response `fullKey` field.
+- `prefix` (e.g., `pk_`) displayed in key list for identification.
 - Keys scoped: `read`, `write`, `admin`.
-- Keys belong to the creating user.
+- Keys belong to the creating user (`created_by` column).
+- Key can be revoked via `DELETE /api/apikeys/:id`.
 
 ### BR-APIKEY-02 — Key Authentication
-- **Status**: 🚧 Partially Implemented
-- `getApiKeyByHash()` and `touchApiKey()` exist for verification and last-used tracking.
-- ⚠️ No `x-api-key` header check middleware exists yet. Planned for Phase 3D.
+- **Status**: ✅ Implemented
+- `requireApiKey` middleware in `middleware/auth.ts` checks `x-api-key` header.
+- Calls `getApiKeyByHash()` to validate key, `touchApiKey()` to update `last_used_at`.
+- ⚠️ Keys stored as plaintext in `key_hash` column — no cryptographic hashing.
 
 ---
 

@@ -17,16 +17,17 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Collectors** | `collectors/*.ts` | Reads raw Linux metrics from `/proc`, Docker socket, `df`, `systemctl`, `pm2` |
 | **Collector Orchestrator** | `collectors/index.ts` | `collectAll()` — runs all collectors in parallel with `Promise.allSettled` |
 | **WebSocket Hub** | `ws/hub.ts` | Runs collection loop every 5s, broadcasts to Socket.IO clients, persists to SQLite |
-| **Alert Engine** | `alerts.ts` | Evaluates threshold rules after each collection tick, fires notifications, enforces cooldowns |
+| **Alert Engine** | `alerts.ts` | Evaluates threshold rules after each collection tick, fires notifications via Telegram/Discord/Webhooks, enforces cooldowns |
 | **Database** | `db/index.ts` | SQLite singleton, schema migration, all query functions |
 | **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint. JWT contains `{ sub, username, role }`. `last_login_at` updated on login. |
-| **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query |
-| **Docker Routes** | `routes/docker.ts` | Container list, start/stop/restart/remove, log streaming |
+| **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query. Alert rule CRUD gated behind `requireAdmin`. |
+| **Docker Routes** | `routes/docker.ts` | Container list, log streaming (viewer+). Start/stop/restart/remove gated behind `requireAdmin`. |
 | **Status Route** | `routes/status.ts` | Public unauthenticated status page data |
+| **Team Routes** | `routes/team.ts` | User CRUD (owner-gated), invite generation/revocation (admin-gated), accept-invite (no auth) |
+| **Server Routes** | `routes/servers.ts` | Remote server CRUD (admin-gated), `apiToken` stripped from all responses, polling loop via `startRemotePolling()` |
+| **API Key Routes** | `routes/apikeys.ts` | API key CRUD (one-time reveal), webhook CRUD. All admin-gated. |
 
-> 📋 **Planned (Phase 3-4)**: `routes/team.ts`, `routes/servers.ts`, `routes/billing.ts`, `routes/apikeys.ts`
-> 
-> 🚧 **In Progress (Phase 3A)**: `middleware/auth.ts` now has `requireAdmin` and `requireOwner`. `db/index.ts` has RBAC, invite, server, API key, and webhook query functions (tables + CRUD). Route handlers for team, servers, and API keys are not yet wired.
+> 📋 **Planned (Phase 4)**: `routes/billing.ts`
 
 ### Frontend (`apps/web`)
 
@@ -42,11 +43,10 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **History** | `history/HistoryPage.tsx` | Time-series charts with range selector (1h/6h/24h/7d) |
 | **Alerts** | `alerts/AlertsPage.tsx` | Alert events feed + rule management |
 | **Settings** | `alerts/SettingsPage.tsx` | Server info, notification config |
-| **Servers** | `servers/ServersPage.tsx` | 🚧 Stub — Coming in Phase 3C |
-| **Team** | `servers/TeamPage.tsx` | 🚧 Stub — Coming in Phase 3B |
-| **API Keys** | `saas/ApiKeysPage.tsx` | 🚧 Stub — Coming in Phase 3D |
+| **Servers** | `servers/ServersPage.tsx` | Remote server cards with CPU/RAM/Disk, add/remove, online status |
+| **Team** | `servers/TeamPage.tsx` | User list with role management, invite creation + link sharing |
+| **API Keys** | `saas/ApiKeysPage.tsx` | Key creation (one-time reveal), webhook management |
 
-> 🚧 **In Progress (Phase 3)**: `ServersPage.tsx`, `TeamPage.tsx`, `ApiKeysPage.tsx` — stub components exist, full implementations planned for later sub-phases.
 > 📋 **Planned (Phase 4)**: `saas/BillingPage.tsx`
 
 ### Shared Types (`packages/types`)
@@ -55,9 +55,9 @@ Single file `src/index.ts` exports all interfaces shared between frontend and ba
 
 ---
 
-## User Roles (🚧 Phase 3A — foundation implemented)
+## User Roles (✅ Phase 3 — fully implemented)
 
-> RBAC types, DB schema, JWT role claims, and auth middleware are implemented. Route-level role enforcement and team management UIs are planned for later sub-phases.
+> RBAC is fully implemented: types, DB schema, JWT role claims, middleware, route-level enforcement, and UI role filtering.
 
 | Role | Permissions |
 |---|---|
@@ -85,13 +85,13 @@ Key implementation requirements: `role` column on `users` table, `role` claim in
 5. If threshold crossed and cooldown elapsed → `fireAlert()` → DB insert + Socket.IO broadcast + Telegram/Discord
 6. All 4 metric payloads broadcast via `io.emit()` to all authenticated WS clients
 
-### Remote Server Polling (📋 Planned — Phase 3)
+### Remote Server Polling (✅ Phase 3C)
 1. `startRemotePolling()` called on boot — polls all servers in `servers` table
 2. Each remote server polled via `fetch(apiUrl/api/metrics/now)` with stored API token
 3. Results cached in `remoteCache` Map (in-memory, resets on restart)
 4. Frontend fetches `/api/servers` REST endpoint (not WS) to display server cards
 
-### Team Invite Flow (📋 Planned — Phase 3)
+### Team Invite Flow (✅ Phase 3B)
 1. Admin/owner POSTs to `/api/team/invite` with `{ email, role }`
 2. Token stored in `invites` table (48h expiry)
 3. Invite URL returned in API response (email sending NOT implemented — URL shown in UI)

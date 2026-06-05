@@ -28,14 +28,17 @@ pulseos/                          # Monorepo root
 │   │       │   └── processes.ts  # /proc/{pid}/* → top processes by CPU
 │   │       ├── db/
 │   │       │   └── index.ts      # SQLite singleton, migrate(), all query functions
-│   │       ├── middleware/
-│   │       │   └── auth.ts       # requireAuth, requireAdmin, requireOwner — JWT verify + role checks
+│   │       └── middleware/
+│   │           └── auth.ts       # requireAuth, requireAdmin, requireOwner, requireApiKey — JWT verify + role + API key checks
 │   │       ├── routes/
 │   │       │   ├── auth.ts       # /api/auth — login, setup, /me
-│   │       │   ├── metrics.ts    # /api/metrics — /now, /history, /api/alerts
-│   │       │   ├── docker.ts     # /api/docker — list, actions, logs
-│   │       │   └── status.ts     # /status — public, no auth
-│   │       │   └── (planned)     # team.ts, servers.ts, apikeys.ts, billing.ts for Phase 3-4
+│   │       │   ├── metrics.ts    # /api/metrics — /now, /history, /api/alerts (POST rules admin-gated)
+│   │       │   ├── docker.ts     # /api/docker — list, logs (viewer+); actions, remove (admin-gated)
+│   │       │   ├── status.ts     # /status — public, no auth
+│   │       │   ├── team.ts       # /api/team — users, invites, accept-invite
+│   │       │   ├── servers.ts    # /api/servers — remote server CRUD + polling loop
+│   │       │   ├── apikeys.ts    # /api/apikeys — API keys, webhooks
+│   │       │   └── (planned)     # billing.ts for Phase 4
 │   │       └── ws/
 │   │           └── hub.ts        # Socket.IO server + collection loop
 │   │
@@ -43,7 +46,8 @@ pulseos/                          # Monorepo root
 │       └── src/
 │           ├── pages/
 │           │   ├── index.astro       # Shell → <App client:only="react" />
-│           │   └── status.astro      # Public status page (vanilla JS)
+│           │   ├── status.astro      # Public status page (vanilla JS)
+│           │   └── accept-invite.astro  # Accept team invite (vanilla JS, no auth)
 │           ├── components/
 │           │   ├── App.tsx           # Auth gate → Dashboard or LoginPage
 │       │       ├── layout/
@@ -65,10 +69,10 @@ pulseos/                          # Monorepo root
 │       │       │   ├── ProcessTable.tsx
 │       │       │   └── ProcessesPage.tsx
 │       │       ├── servers/
-│       │       │   ├── ServersPage.tsx  # 🚧 Stub — Phase 3C
-│       │       │   └── TeamPage.tsx     # 🚧 Stub — Phase 3B
+│       │       │   ├── ServersPage.tsx  # Remote server CRUD + cards
+│       │       │   └── TeamPage.tsx     # User management + invites
 │       │       ├── saas/
-│       │       │   └── ApiKeysPage.tsx  # 🚧 Stub — Phase 3D
+│       │       │   └── ApiKeysPage.tsx  # API key + webhook management
 │           ├── hooks/useSocket.ts    # Socket.IO connection + store wiring
 │           ├── stores/metrics.ts     # Zustand — all live state
 │           └── lib/utils.ts         # fmtBytes, fmtUptime, fmtPct, etc.
@@ -101,6 +105,7 @@ pulseos/                          # Monorepo root
 │                             → fireAlert()                   │
 │                               → insertAlertEvent()          │
 │                               → Telegram / Discord          │
+│                               → Webhook dispatch            │
 │                               → Socket.IO emit              │
 │             ↓                       ↓                       │
 │  ┌──────────────────────────────────────────────────┐       │
@@ -157,7 +162,7 @@ Browser → socket.io-client.connect(API_URL, { path: '/ws', auth: { token } })
 ### Docker Action
 ```
 Client POST /api/docker/:id/restart
-  → requireAuth
+  → requireAdmin (Phase 3E — container mutations require admin/owner)
   → dockerPost('/containers/:id/restart') via Node http.request to unix socket
   → Docker daemon performs action
   → Next WS tick reflects updated container state
@@ -198,7 +203,8 @@ webhooks         (id, url, events, secret, enabled, created_at)
 | Stripe Checkout API | HTTPS POST | Outbound | 📋 Planned (Phase 4) |
 | Stripe Customer Portal | HTTPS POST | Outbound | 📋 Planned (Phase 4) |
 | Stripe Webhook | HTTPS POST | Inbound | 📋 Planned (Phase 4) |
-| Remote PulseOS instances | HTTPS GET | Outbound | 📋 Planned (Phase 3) |
+| Remote PulseOS instances | HTTPS GET | Outbound | ✅ Implemented (Phase 3C) |
+| Webhook delivery | HTTPS POST | Outbound | ✅ Implemented (Phase 3D) |
 | Email / SMTP | — | — | ❌ Not implemented |
 
 ---

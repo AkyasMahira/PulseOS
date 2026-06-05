@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | IP-01 | Alert auto-resolution | S | `alerts.ts`, `db/index.ts` | Track active rule IDs in memory; UPDATE resolved_at when rule stops firing |
 | IP-02 | Disk history writes | S | `ws/hub.ts`, `db/index.ts` | Add `insertDiskHistory()` + call in `tick()` for each disk |
-| IP-03 | RBAC route enforcement | M | `routes/*` | `requireAdmin`/`requireOwner` middleware exists but not applied to existing routes. Apply to container actions, alert CRUD, settings |
+| IP-03 | RBAC route enforcement | M | `routes/*` | ✅ Done (Phase 3E) — `requireAdmin` applied to docker actions and alert rule creation |
 | IP-04 | ALTER TABLE idempotency | S | `db/index.ts` | Bare `ALTER TABLE ADD COLUMN` in `migrate()` will fail on second startup. Add `PRAGMA table_info` guard or try/catch. |
 
 ---
@@ -19,12 +19,12 @@
 
 | # | Task | Complexity | Files | Notes |
 |---|---|---|---|---|
-| P3-01 | RBAC implementation | M | `db/index.ts`, `routes/auth.ts`, `middleware/auth.ts`, `Sidebar.tsx` | ✅ Foundation done (Phase 3A). Remaining: route-level enforcement on existing endpoints |
-| P3-02 | Team management routes | M | `routes/team.ts` | 🚧 DB queries exist (invites, users). Need route handlers + frontend UI |
-| P3-03 | Accept-invite page | S | `pages/accept-invite.astro` | Token validation, username/password form, account creation |
-| P3-04 | Multi-server routes | M | `routes/servers.ts`, `ServersPage.tsx` | 🚧 DB + stub page exist. Need route handlers, polling loop, server cards |
-| P3-05 | API key routes + middleware | M | `routes/apikeys.ts`, `middleware/auth.ts` | 🚧 DB + stub page exist. Need CRUD routes + `x-api-key` middleware |
-| P3-06 | Webhook delivery | M | `routes/apikeys.ts`, `alerts.ts` | 🚧 DB exists. Need CRUD routes + wire `listWebhooks()` into `fireAlert()` |
+| P3-01 | RBAC implementation | M | `db/index.ts`, `routes/auth.ts`, `middleware/auth.ts`, `Sidebar.tsx` | ✅ Done (Phase 3A + 3E) |
+| P3-02 | Team management routes | M | `routes/team.ts` | ✅ Done (Phase 3B) |
+| P3-03 | Accept-invite page | S | `pages/accept-invite.astro` | ✅ Done (Phase 3B) |
+| P3-04 | Multi-server routes | M | `routes/servers.ts`, `ServersPage.tsx` | ✅ Done (Phase 3C) |
+| P3-05 | API key routes + middleware | M | `routes/apikeys.ts`, `middleware/auth.ts` | ✅ Done (Phase 3D) |
+| P3-06 | Webhook delivery | M | `routes/apikeys.ts`, `alerts.ts` | ✅ Done (Phase 3D) |
 | P3-07 | Email invite delivery | M | `routes/team.ts` | Add nodemailer + SMTP config |
 
 ---

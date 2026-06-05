@@ -71,32 +71,32 @@
 - Files: `routes/status.ts`, `pages/status.astro`
 - Notes: No auth required. CORS `*`. Auto-refresh 30s. Calculates 7d uptime from alert_events table. Shows incidents. Pure vanilla JS in Astro page.
 
-### Phase 3 — Multi-Server + Team 🚧 In Progress
+### Phase 3 — Multi-Server + Team ✅ Implemented
 
 **RBAC Foundation (Phase 3A)**
-- Status: 🚧 Partially implemented — types, DB schema, middleware, JWT claims done; route handlers pending
+- Status: ✅ Implemented
 - Files: `packages/types/src/index.ts`, `apps/api/src/db/index.ts`, `apps/api/src/middleware/auth.ts`, `apps/api/src/routes/auth.ts`, `apps/web/src/stores/metrics.ts`, `apps/web/src/components/layout/Sidebar.tsx`, `apps/web/src/components/dashboard/LoginPage.tsx`
-- Notes: `UserRole` type (`owner` | `admin` | `viewer`). `users` table extended with `role`, `email`, `last_login_at`. JWT payload now `{ sub, username, role }`. Three middleware tiers: `requireAuth` (viewer+), `requireAdmin` (owner/admin), `requireOwner` (owner only). All middleware properly returns after `reply.send()`. First user always created as `owner`. Frontend `useAuthStore` stores role in Zustand + localStorage, decodes from JWT for refresh persistence. Sidebar filters nav items by `requireRole` — `servers`, `team`, `apikeys` hidden from viewers. Role badge in sidebar sidebar footer reads from store. `bodyLimit: 1MB` added to Fastify config. JWT secret warning on startup.
+- Notes: `UserRole` type (`owner` | `admin` | `viewer`). `users` table extended with `role`, `email`, `last_login_at`. JWT payload now `{ sub, username, role }`. Three middleware tiers: `requireAuth` (viewer+), `requireAdmin` (owner/admin), `requireOwner` (owner only). All middleware properly returns after `reply.send()`. First user always created as `owner`. Frontend `useAuthStore` stores role in Zustand + localStorage, decodes from JWT for refresh persistence. Sidebar filters nav items by `requireRole` — `servers`, `team`, `apikeys` hidden from viewers. `bodyLimit: 1MB` added to Fastify config. JWT secret warning on startup.
 
-**Multi-Server Infrastructure**
-- Status: 🚧 Partially implemented — DB schema + query functions done; route handlers pending (Phase 3C)
-- Files: `packages/types/src/index.ts`, `apps/api/src/db/index.ts`, `apps/web/src/components/servers/ServersPage.tsx`
-- Notes: `servers` table with `name, host, api_url, api_token, tags`. CRUD functions: `addServer`, `listServers`, `getServer`, `removeServer`. `ServerConfig` type now has `apiToken: string` (required). `RemoteServerStatus` type defined. ⚠️ `listServers()` returns raw `apiToken` — route handler must strip this when implemented. Stub `ServersPage.tsx` ("Coming in Phase 3C").
+**RBAC Route Enforcement (Phase 3E)**
+- Status: ✅ Implemented
+- Files: `apps/api/src/routes/docker.ts`, `apps/api/src/routes/metrics.ts`
+- Notes: Container mutations (start/stop/restart/remove) require `requireAdmin`. Alert rule creation requires `requireAdmin`. Container listing and logs remain viewer-accessible. Route enforcement now covers all existing API endpoints.
 
-**Team Management Infrastructure**
-- Status: 🚧 Partially implemented — DB schema + query functions done; route handlers pending (Phase 3B)
-- Files: `packages/types/src/index.ts`, `apps/api/src/db/index.ts`, `apps/web/src/components/servers/TeamPage.tsx`
-- Notes: `invites` table with 48h expiry, UUID tokens. CRUD functions: `createInvite`, `getInviteByToken`, `listInvites`, `deleteInvite`. `TeamUser` type defined. `insertUser` accepts role/email. `updateUserRole`, `deleteUser`, `getAllUsers` added. Stub `TeamPage.tsx` ("Coming in Phase 3B").
+**Team Management (Phase 3B)**
+- Status: ✅ Implemented
+- Files: `apps/api/src/routes/team.ts`, `apps/web/src/pages/accept-invite.astro`, `apps/web/src/components/servers/TeamPage.tsx`
+- Notes: 7 endpoints: GET/PUT/DELETE users (owner-gated), POST/GET/DELETE invites (admin-gated), GET invite-info + POST accept-invite (no auth). 48h invite expiry. Accept-invite page is vanilla JS (no React). Full TeamPage UI with Users tab (role dropdown for owners) and Invites tab (email+role form, copyable invite URL).
 
-**API Key Infrastructure**
-- Status: 🚧 Partially implemented — DB schema + query functions done; route handlers + middleware pending (Phase 3D)
-- Files: `packages/types/src/index.ts`, `apps/api/src/db/index.ts`, `apps/web/src/components/saas/ApiKeysPage.tsx`
-- Notes: `api_keys` table with `prefix, key_hash, scope, last_used_at`. CRUD: `createApiKey`, `listApiKeys`, `getApiKeyByHash`, `touchApiKey`, `revokeApiKey`. `ApiKeyScope` type (`read` | `write` | `admin`). Stub `ApiKeysPage.tsx` ("Coming in Phase 3D").
+**Multi-Server (Phase 3C)**
+- Status: ✅ Implemented
+- Files: `apps/api/src/routes/servers.ts`, `apps/web/src/components/servers/ServersPage.tsx`
+- Notes: 5 endpoints: GET/POST/DELETE servers + GET status (admin-gated). `apiToken` stripped from all responses via `stripToken()`. `startRemotePolling()` polls all servers every `COLLECT_INTERVAL_MS`, caches in `remoteCache` Map. Full ServersPage UI with add form, server cards (CPU/RAM/Disk), online/offline badges, auto-refresh.
 
-**Webhook Infrastructure**
-- Status: 🚧 Partially implemented — DB schema + query functions done; route handlers + alert dispatch pending (Phase 3D)
-- Files: `packages/types/src/index.ts`, `apps/api/src/db/index.ts`
-- Notes: `webhooks` table with `url, events, secret, enabled`. CRUD: `createWebhook`, `listWebhooks`, `deleteWebhook`. ⚠️ Alert engine not yet wired to call `listWebhooks()`.
+**API Keys + Webhooks (Phase 3D)**
+- Status: ✅ Implemented
+- Files: `apps/api/src/routes/apikeys.ts`, `apps/api/src/middleware/auth.ts`, `apps/api/src/alerts.ts`, `apps/web/src/components/saas/ApiKeysPage.tsx`
+- Notes: 6 endpoints for API key + webhook CRUD (admin-gated). One-time full key reveal at creation. `requireApiKey` middleware validates `x-api-key` header. Webhook dispatch in `fireAlert()` via `listWebhooks()` — filters enabled webhooks by event, POSTs with `X-Webhook-Secret`. Full ApiKeysPage UI with Keys tab (scope select, one-time display) and Webhooks tab (URL + event checkboxes).
 
 ### Phase 4 — Billing / SaaS 📋 Planned
 
@@ -120,11 +120,6 @@
 
 | Feature | Planned Files | Notes |
 |---|---|---|
-| Multi-server support | `routes/servers.ts`, `ServersPage.tsx` | Remote servers via HTTP polling, in-memory cache |
-| Team management + RBAC | `routes/team.ts`, `TeamPage.tsx`, `accept-invite.astro` | Roles (owner/admin/viewer), invites, JWT role claim |
-| API keys | `routes/apikeys.ts`, `ApiKeysPage.tsx` | CRUD + auth middleware; requires `api_keys` table |
-| Webhook delivery | `routes/apikeys.ts`, `alerts.ts` | CRUD + trigger in alert engine; requires `webhooks` table |
-| Billing / Stripe | `routes/billing.ts`, `BillingPage.tsx` | Plans, checkout, webhook handler; requires `subscription` table |
 | Email invites | `routes/team.ts` | SMTP/nodemailer integration |
 | SSO/SAML | — | Enterprise plan feature |
 | Password reset | — | Forgot-password flow, reset tokens | |
@@ -137,21 +132,27 @@
 
 **Auth routes** — Provides login, first-run setup, `/me`. JWT payload: `{ sub, username, role }`. `updateLastLogin()` called on login. First-run setup and admin seed always create `owner` role.
 
-**Auth middleware** — Three exported async functions: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only). All properly return after `reply.send()` — no async flow continuation.
+**Auth middleware** — Four exported async functions: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only), `requireApiKey` (validates `x-api-key` header against `api_keys` table). All properly return after `reply.send()`.
 
-**Sidebar** — 10 nav items with role-based filtering. `requireRole` arrays on `servers`, `team`, `apikeys` hide items from viewers. Role badge reads from `useAuthStore().role` via `ROLE_LABELS` map. Badge counters for alerts and offline services.
+**Sidebar** — 10 nav items with role-based filtering. `requireRole` arrays on `servers`, `team`, `apikeys` hide items from viewers. Role badge reads from `useAuthStore().role` via `ROLE_LABELS` map.
 
-**Dashboard** — Page router with 10 pages (3 new: `servers`, `team`, `apikeys`). New pages render placeholder stubs.
+**Dashboard** — Page router with 10 pages. All Phase 3 pages (servers, team, apikeys) have full implementations.
+
+**Docker routes** — Container mutations (start/stop/restart/remove) gated behind `requireAdmin`. Listing and logs remain viewer-accessible.
+
+**Alert engine** — Fires to Telegram, Discord, and webhooks. Webhook dispatch runs in parallel with channel-based notifications via `Promise.allSettled`.
 
 ---
 
 ## Known Limitations
 
 1. **Linux-only**: All collectors depend on `/proc` filesystem and Linux-specific commands. Will fail on macOS/Windows.
-2. **RBAC partially implemented**: Types, DB schema, JWT claims, and middleware exist, but no route handlers enforce role checks on dashboard endpoints yet. Team, server, and API key routes are not yet wired.
-3. **No horizontal scaling**: SQLite + in-memory caches (alert cooldowns) prevent multi-instance deployment.
+2. **RBAC implemented**: Full role hierarchy (owner/admin/viewer) with middleware and route enforcement. JWT role claim means role changes require re-login.
+3. **No horizontal scaling**: SQLite + in-memory caches (alert cooldowns, remote server cache) prevent multi-instance deployment.
 4. **JWT-only auth**: No session invalidation mechanism. Logout is client-side only (removes token from localStorage). Role changes require re-login (stale JWT role claim).
 5. **Single-tenant SQLite**: All users share one database. No data isolation between tenants (relevant for SaaS path).
 6. **No test suite**: Zero tests across entire codebase.
 7. **No input sanitization layer**: Route handlers validate presence but not format/content of inputs beyond Fastify's JSON schema on login.
 8. **ALTER TABLE idempotency**: `migrate()` uses bare `ALTER TABLE ADD COLUMN` which will fail on second startup if columns already exist. No `PRAGMA table_info` guard.
+9. **API keys stored as plaintext**: `key_hash` column stores the raw key, not a hash. `requireApiKey` compares directly. No cryptographic hashing.
+10. **Webhook secrets auto-generated**: `createWebhook()` generates a 24-char secret but no HMAC signature is computed on outgoing payloads. The `X-Webhook-Secret` header is sent for consumer-side verification only.

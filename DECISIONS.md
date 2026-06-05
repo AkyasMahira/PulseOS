@@ -88,17 +88,15 @@
 
 ---
 
-## D-08 — In-Memory Remote Server Cache (📋 Planned)
+## D-08 — In-Memory Remote Server Cache (✅ Implemented)
 
-**Decision (Planned)**: Cache remote server snapshots in a `Map` (`remoteCache`) in API process memory rather than persisting to SQLite.
+**Decision**: Cache remote server snapshots in a `Map` (`remoteCache`) in API process memory rather than persisting to SQLite.
 
 **Reason**: Simplifies implementation. Remote snapshots are ephemeral — stale on restart is acceptable.
 
-**Current State**: Not yet implemented. No `routes/servers.ts` file exists. Planned for Phase 3.
+**Evidence**: `routes/servers.ts:8` — `const remoteCache = new Map<string, RemoteServerStatus>()`. The `startRemotePolling()` function polls all servers on an interval and caches results. The `GET /api/servers` endpoint reads from the cache for status display.
 
-**Evidence (planned)**: Will create `const remoteCache = new Map<string, RemoteServerStatus>()` in `routes/servers.ts`. No DB insert for remote metrics.
-
-**Impact (planned)**: Remote server status lost on API restart. No historical data for remote servers.
+**Impact**: Remote server status lost on API restart. No historical data for remote servers. Cache entries cleared when server is deleted.
 
 ---
 
@@ -110,7 +108,7 @@
 
 **Evidence**: `alerts.ts:73` — `let alertCallback: AlertCallback | null = null`. `ws/hub.ts` — `onAlert((event) => { io?.emit('alert:fired', event) })`.
 
-**Impact**: Only one callback can be registered. If a second caller registers via `onAlert()`, the previous callback is replaced. Webhook delivery will need to either use this same callback pattern or call `listWebhooks()` directly inside `fireAlert()`.
+**Impact**: Only one callback can be registered. If a second caller registers via `onAlert()`, the previous callback is replaced. Webhook delivery (Phase 3D) bypasses this callback entirely — `fireAlert()` calls `listWebhooks()` directly within the alert engine and POSTs to each webhook URL in parallel.
 
 ---
 
@@ -144,18 +142,30 @@
 
 **Reason**: Separates data layer concerns from HTTP layer concerns. All query functions live in `db/index.ts` making it the single source of truth for DB access. Route handlers only call exported functions — never write raw SQL.
 
-**Evidence**: `db/index.ts` lines 209-366 contain 13 new query functions (user management, invites, servers, API keys, webhooks) with no corresponding route handlers yet. This follows the pattern set in AGENTS.md rule #2.
+**Evidence**: `db/index.ts` lines 209-366 contain 21 new query functions (user management, invites, servers, API keys, webhooks) that were built before route handlers. Phase 3B-3D then wired these into `routes/team.ts`, `routes/servers.ts`, and `routes/apikeys.ts`.
 
 **Impact**: Changes the development order for Phase 3 sub-phases: DB schema + queries first, then route handlers, then frontend pages. This commit completed the DB schema + query layer for all Phase 3 features at once.
 
 ---
 
-## D-13 — Placeholder Stub Pages for Future Phases
+## D-13 — Placeholder Stub Pages for Future Phases (✅ Resolved — replaced by Phase 3B-3D)
 
 **Decision**: Add rendering entries in Dashboard.tsx and placeholder components for ServersPage, TeamPage, and ApiKeysPage before they are fully implemented.
 
-**Reason**: Enables adding navigation items and PageId types without breaking the dashboard. The stubs display "Coming in Phase 3B/3C/3D" messages, providing clear status to developers.
+**Reason**: Enables adding navigation items and PageId types without breaking the dashboard. The stubs displayed "Coming in Phase 3B/3C/3D" messages.
 
-**Evidence**: `components/servers/ServersPage.tsx` (9 lines) — returns placeholder div. `components/servers/TeamPage.tsx` (9 lines) — same pattern. `components/saas/ApiKeysPage.tsx` (9 lines) — same pattern. All wired into `Dashboard.tsx` router.
+**Evidence (original)**: `components/servers/ServersPage.tsx` (9 lines), `TeamPage.tsx` (9 lines), `saas/ApiKeysPage.tsx` (9 lines) — all return placeholder div.
 
-**Impact**: Users will see placeholder pages if navigation allows access before features are implemented. Sidebar hides these pages from viewers via `requireRole` filter but owner/admin can access them.
+**Resolution**: All three stubs were replaced by full implementations in Phase 3B (TeamPage, 265 lines), Phase 3C (ServersPage, 222 lines), and Phase 3D (ApiKeysPage, 285 lines). Each was replaced incrementally per sub-phase without breaking the dashboard router.
+
+---
+
+## D-14 — Direct Webhook Dispatch in Alert Engine
+
+**Decision**: Webhook delivery runs as a direct `listWebhooks()` call inside `fireAlert()` rather than using the single `alertCallback` pattern used by Socket.IO.
+
+**Reason**: The single-callback pattern (D-09) only supports one consumer. Webhooks need independent delivery with per-endpoint filtering (enabled + event match). Using direct calls avoids callback contention.
+
+**Evidence**: `alerts.ts:82-104` — `const webhooks = listWebhooks()` followed by `filter(w => w.enabled && w.events.includes('alert:fired'))` and parallel `fetch()` to each URL with `X-Webhook-Secret` header.
+
+**Impact**: Webhook delivery is synchronous within the alert tick (parallel via `Promise.allSettled`). A slow or hanging webhook won't block other alert dispatches (Telegram/Discord run in a separate `Promise.allSettled`). Failed webhook calls are logged but not retried.
