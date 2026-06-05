@@ -73,7 +73,7 @@ export function SettingsPage() {
       <div className="bg-surface-2 border border-surface-border rounded-lg p-4">
         <div className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mb-3">Notifications</div>
         <div className="text-xs text-slate-400 font-mono mb-3">
-          Configure in <code className="text-slate-300 bg-surface-3 px-1.5 py-0.5 rounded">apps/api/.env</code>
+            Configure in <code className="text-slate-300 bg-surface-3 px-1.5 py-0.5 rounded">.env</code> (root directory)
         </div>
         <div className="space-y-1 text-[11px] font-mono">
           {[

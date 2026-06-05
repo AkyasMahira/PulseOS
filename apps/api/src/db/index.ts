@@ -78,11 +78,6 @@ function migrate(db: Database.Database) {
       created_at   INTEGER NOT NULL
     );
 
-    -- Phase 3: add role, email, last_login_at columns to users (safe ALTER TABLE IF NOT EXISTS pattern)
-    ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';
-    ALTER TABLE users ADD COLUMN email TEXT;
-    ALTER TABLE users ADD COLUMN last_login_at INTEGER;
-
     CREATE TABLE IF NOT EXISTS invites (
       id           TEXT PRIMARY KEY,
       email        TEXT NOT NULL,
@@ -122,6 +117,15 @@ function migrate(db: Database.Database) {
       created_at   INTEGER NOT NULL
     );
   `)
+
+  // Phase 3: guarded column additions (SQLite lacks ADD COLUMN IF NOT EXISTS)
+  for (const stmt of [
+    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'",
+    "ALTER TABLE users ADD COLUMN email TEXT",
+    "ALTER TABLE users ADD COLUMN last_login_at INTEGER",
+  ]) {
+    try { db.exec(stmt) } catch {}
+  }
 }
 
 // ── Metrics history ──────────────────────────────────────────────────────────
