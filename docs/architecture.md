@@ -8,6 +8,8 @@
 pulseos/                          # Monorepo root
 ├── package.json                  # npm workspaces config
 ├── tsconfig.json                 # Base TS config (extended by apps)
+├── .env                          # Backend environment variables (dotenv/config)
+├── .env.example                  # Backend environment template
 ├── ecosystem.config.cjs          # PM2 process config
 ├── nginx.conf                    # Production reverse proxy config
 ├── deploy.sh                     # Build + deploy script
@@ -43,6 +45,7 @@ pulseos/                          # Monorepo root
 │   │           └── hub.ts        # Socket.IO server + collection loop
 │   │
 │   └── web/                      # Astro + React frontend (static output)
+│       ├── .env                  # Frontend PUBLIC_API_URL (Astro/Vite define)
 │       └── src/
 │           ├── pages/
 │           │   ├── index.astro       # Shell → <App client:only="react" />
@@ -178,6 +181,7 @@ disk_history     (id, ts, mountpoint, used, total)    ← created but never writ
 alert_rules      (id, name, metric, condition, threshold, severity, channels, cooldown, enabled, created_at)
 alert_events     (id, rule_id, rule_name, severity, message, value, threshold, fired_at, resolved_at)
 users            (id, username, password, role, email, last_login_at, created_at)
+-- role, email, last_login_at added via ALTER TABLE with try/catch guard
 invites          (id, email, role, token, expires_at, created_by, created_at)
 servers          (id, name, host, api_url, api_token, tags, added_at)
 api_keys         (id, prefix, key_hash, scope, created_by, created_at, last_used_at)

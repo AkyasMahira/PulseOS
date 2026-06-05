@@ -145,6 +145,9 @@ All page components → fetch REST APIs for non-live data (history)
 | `DISCORD_WEBHOOK_URL` | — | Discord alerts |
 | `WEB_ORIGIN` | `http://localhost:4321` | CORS |
 | `STATUS_PAGE_TITLE` | `System Status` | Public status page |
+| `STATUS_PAGE_DESC` | `Real-time service status` | Public status page description |
 | `DB_PATH` | `apps/api/data/pulseos.db` | SQLite location |
 
 > 📋 **Planned (Phase 4)**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`
+
+> **Env file locations**: Root `.env` = backend (`dotenv/config`). `apps/web/.env` = frontend (`PUBLIC_API_URL` via Astro/Vite `define`). They do NOT share variables.

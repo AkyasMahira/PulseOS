@@ -11,7 +11,26 @@
 | IP-01 | Alert auto-resolution | S | `alerts.ts`, `db/index.ts` | Track active rule IDs in memory; UPDATE resolved_at when rule stops firing |
 | IP-02 | Disk history writes | S | `ws/hub.ts`, `db/index.ts` | Add `insertDiskHistory()` + call in `tick()` for each disk |
 | IP-03 | RBAC route enforcement | M | `routes/*` | ✅ Done (Phase 3E) — `requireAdmin` applied to docker actions and alert rule creation |
-| IP-04 | ALTER TABLE idempotency | S | `db/index.ts` | Bare `ALTER TABLE ADD COLUMN` in `migrate()` will fail on second startup. Add `PRAGMA table_info` guard or try/catch. |
+| IP-04 | ALTER TABLE idempotency | S | `db/index.ts` | ✅ Done — ALTER TABLE wrapped in try/catch loop |
+
+---
+
+## 📋 v1 Release Sprint (Pre-release Hardening)
+
+> Tasks required before v1.0 public release. Complexity: **S** = Small (< 2h) | **M** = Medium (2-8h)
+
+| # | Task | Complexity | Priority | Files | Notes |
+|---|---|---|---|---|---|
+| V1-01 | Enforce JWT secret in production | S | 🔴 Critical | `index.ts` | `process.exit(1)` if `JWT_SECRET === 'dev-secret-change-me'` and `NODE_ENV === 'production'` |
+| V1-02 | Input validation on all POST routes | M | 🔴 Critical | All route files | Fastify JSON `schema.body` on team, servers, apikeys POST endpoints |
+| V1-03 | Remove unused dependencies | S | 🔴 Critical | `package.json` (both apps) | `node-telegram-bot-api`, `@fastify/websocket`, `clsx`, `tailwind-merge`, `@radix-ui/*` |
+| V1-04 | Alert auto-resolution | S | 🟡 Important | `alerts.ts`, `db/index.ts` | Track active rule IDs; UPDATE `resolved_at` when rule stops firing |
+| V1-05 | Disk history writes | S | 🟡 Important | `ws/hub.ts`, `db/index.ts` | `insertDiskHistory()` + call in `tick()` for each disk |
+| V1-06 | Alert cooldown persistence | S | 🟡 Important | `alerts.ts`, `db/index.ts` | Persist `last_fired_at` to `alert_rules` table to survive restarts |
+| V1-07 | Mobile sidebar drawer | S | 🟢 Nice-to-have | `Dashboard.tsx`, `Sidebar.tsx` | `mobileMenuOpen` state exists; wire hamburger toggle for `<lg` screens |
+| V1-08 | Audit log for destructive actions | M | 🟢 Nice-to-have | All route files | Log container actions, user deletion, role changes, invite creation |
+
+**Total estimate**: ~8-12 hours for the full sprint. V1-01 through V1-04 alone (~3 hours) are sufficient for a minimal production-ready release.
 
 ---
 

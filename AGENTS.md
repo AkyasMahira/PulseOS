@@ -35,6 +35,7 @@
 
 ```
 pulseos/
+├── .env                          # Backend environment variables (dotenv/config)
 ├── apps/
 │   ├── api/src/
 │   │   ├── collectors/      # Linux /proc readers — Linux-only, graceful fallbacks
@@ -44,6 +45,7 @@ pulseos/
 │   │   ├── alerts.ts        # Threshold engine + notification dispatch (Telegram, Discord, Webhooks)
 │   │   ├── middleware/auth.ts  # requireAuth, requireAdmin, requireOwner, requireApiKey
 │   └── web/src/
+│       ├── .env              # Frontend PUBLIC_API_URL (Astro/Vite)
 │       ├── components/
 │       │   ├── dashboard/   # MetricCard, Dashboard (router), NetworkPage
 │       │   ├── charts/      # SparkLine
@@ -100,7 +102,7 @@ pulseos/
 
 1. **Linux-only collectors**: All `apps/api/src/collectors/` files read from `/proc/*` and `/etc/hostname`. They will FAIL on macOS/Windows. Wrap in try/catch with fallbacks (already done in `collectors/index.ts`).
 2. **Single SQLite instance**: `getDb()` returns a singleton. Never create a second Database instance.
-3. **No migrations system**: `migrate()` uses `CREATE IF NOT EXISTS`. Adding columns to existing tables requires `ALTER TABLE` statements appended to `migrate()`.
+3. **No migrations system**: `migrate()` uses `CREATE IF NOT EXISTS`. Column additions use `ALTER TABLE ADD COLUMN` wrapped in try/catch — never add bare ALTER TABLE statements inside `db.exec()` without a guard.
 4. **RBAC implemented (Phase 3A)**: Three roles: `owner` > `admin` > `viewer`. `users` table now has `role`, `email`, `last_login_at` columns. JWT contains `{ sub, username, role }`. Middleware stack: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only). Frontend sidebar filters nav items by role.
 5. **JWT payload shape**: `{ sub: number, username: string, role: UserRole }` — role is embedded in JWT, decoded client-side via `decodeRoleFromToken()` for refresh persistence. Role stored in Zustand `useAuthStore` + `localStorage(pulse_role)`.
 6. **Astro output is static**: `output: 'static'` in `astro.config.mjs`. All data fetching happens client-side.
@@ -136,6 +138,7 @@ pulseos/
 9. **Do not use `node-telegram-bot-api` package** — it's in `package.json` but alerts use direct `fetch()` to Telegram API. The package is dead weight.
 10. **When adding a new protected route**: (a) use `requireAuth` for viewer+ access, (b) use `requireAdmin` for owner/admin access, (c) use `requireOwner` for owner-only access — all from `middleware/auth.ts`. Never inline role checks.
 11. **Body limit is enforced**: Fastify `bodyLimit: 1_048_576` (1MB). Do not remove or increase without careful consideration for 2GB VPS memory budget.
-12. **`ALTER TABLE ADD COLUMN` is not idempotent in SQLite** — it will fail if the column already exists. New columns must be added inside a migration guard (check if column exists via `PRAGMA table_info`) or handled with try/catch.
+12. **`ALTER TABLE ADD COLUMN` is not idempotent in SQLite** — it will fail if the column already exists. Wrap each ALTER TABLE in try/catch after the main `db.exec()` block. Never place bare ALTER TABLE inside the shared exec call.
 13. **Accept-invite pages use vanilla JS** — `accept-invite.astro` follows the `status.astro` pattern: self-contained HTML + inline `<script type="module">`, no React. Target user is not yet authenticated when visiting this page.
 14. **Webhook secrets are auto-generated** — `createWebhook()` in `routes/apikeys.ts` generates a 24-char secret via `crypto.randomUUID()`. The secret is returned once at creation and stored in the `webhooks` table. No HMAC signature generation is performed on outgoing webhook payloads.
+15. **Two `.env` files, different scopes**: Root `.env` is for backend (`process.env` via `import 'dotenv/config'`). `apps/web/.env` is for frontend (`PUBLIC_API_URL` via Astro/Vite `define`). They do NOT share variables. Backend env vars go in root `.env`; frontend `PUBLIC_*` vars go in `apps/web/.env`.

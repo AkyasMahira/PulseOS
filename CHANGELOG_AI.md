@@ -107,6 +107,19 @@
 
 ---
 
+## Bug Fixes
+
+| Fix | Description | File | Date |
+|---|---|---|---|
+| ALTER TABLE idempotency | Bare `ALTER TABLE ADD COLUMN` in `migrate()` caused `SqliteError: duplicate column name` on second boot. Fixed by wrapping each statement in try/catch after the main `db.exec()` block. | `db/index.ts:121-128` | — |
+| Stale env reference | SettingsPage referenced deleted `apps/api/.env`. Updated to `.env` (root directory). | `SettingsPage.tsx:76` | — |
+
+## Refactored Config
+
+**Environment variables** — Split into two files: root `.env` (16 backend vars loaded by `dotenv/config`) and `apps/web/.env` (1 frontend var loaded by Astro/Vite `define`). Removed stale `apps/api/.env`. Added `STATUS_PAGE_DESC` to env schema.
+
+---
+
 ## Partially Implemented Features ⚠️
 
 | Feature | What Works | What's Missing | File |
@@ -153,6 +166,6 @@
 5. **Single-tenant SQLite**: All users share one database. No data isolation between tenants (relevant for SaaS path).
 6. **No test suite**: Zero tests across entire codebase.
 7. **No input sanitization layer**: Route handlers validate presence but not format/content of inputs beyond Fastify's JSON schema on login.
-8. **ALTER TABLE idempotency**: `migrate()` uses bare `ALTER TABLE ADD COLUMN` which will fail on second startup if columns already exist. No `PRAGMA table_info` guard.
+8. **ALTER TABLE idempotency**: ✅ Fixed — ALTER TABLE statements now wrapped in try/catch. Second boot no longer crashes.
 9. **API keys stored as plaintext**: `key_hash` column stores the raw key, not a hash. `requireApiKey` compares directly. No cryptographic hashing.
 10. **Webhook secrets auto-generated**: `createWebhook()` generates a 24-char secret but no HMAC signature is computed on outgoing payloads. The `X-Webhook-Secret` header is sent for consumer-side verification only.

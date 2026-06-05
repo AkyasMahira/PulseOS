@@ -169,3 +169,27 @@
 **Evidence**: `alerts.ts:82-104` — `const webhooks = listWebhooks()` followed by `filter(w => w.enabled && w.events.includes('alert:fired'))` and parallel `fetch()` to each URL with `X-Webhook-Secret` header.
 
 **Impact**: Webhook delivery is synchronous within the alert tick (parallel via `Promise.allSettled`). A slow or hanging webhook won't block other alert dispatches (Telegram/Discord run in a separate `Promise.allSettled`). Failed webhook calls are logged but not retried.
+
+---
+
+## D-15 — Separate .env Files for Backend and Frontend
+
+**Decision**: Use two separate `.env` files: root `.env` for backend (`process.env` via `dotenv/config`) and `apps/web/.env` for frontend (`PUBLIC_API_URL` via Astro/Vite `define`).
+
+**Reason**: `dotenv/config` loads from CWD (root when running `npm run dev`). Astro/Vite loads `.env` from the project root (`apps/web/`). They operate in different process contexts — backend Node.js vs frontend Vite build. Consolidating both into one file would require Astro/Vite config changes or shell-level env injection.
+
+**Evidence**: `apps/api/src/index.ts:1` — `import 'dotenv/config'` (loads root `.env`). `apps/web/astro.config.mjs:8-10` — `vite.define` reads `process.env.PUBLIC_API_URL` from Vite's env loading (which reads `apps/web/.env` at config evaluation time).
+
+**Impact**: Two files to maintain. No variable overlap — root `.env` has 16 backend vars; `apps/web/.env` has 1 frontend var. Adding a new `PUBLIC_*` variable requires updating both files.
+
+---
+
+## D-16 — Try/Catch Guard for ALTER TABLE Migrations
+
+**Decision**: Wrap `ALTER TABLE ADD COLUMN` statements in individual try/catch blocks after the main `db.exec()` migration block, rather than using `PRAGMA table_info` checks.
+
+**Reason**: SQLite has no `ADD COLUMN IF NOT EXISTS`. The `PRAGMA table_info` approach requires parsing column names from query results, adding complexity. try/catch is simpler, idempotent, and fails silently on duplicate columns.
+
+**Evidence**: `db/index.ts:121-128` — Three ALTER TABLE statements for `role`, `email`, `last_login_at` run in a `for` loop with individual try/catch. First boot: columns added. Subsequent boots: `SQLITE_ERROR` caught, process continues.
+
+**Impact**: Migration errors on truly invalid SQL (syntax errors, missing tables) are still silently swallowed. Acceptable for a single-file migration with known column additions. If more complex migrations are needed in the future, a proper migration framework should be used.
