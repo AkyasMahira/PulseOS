@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.js'
 import { metricsRoutes, alertRoutes } from './routes/metrics.js'
 import { dockerRoutes } from './routes/docker.js'
 import { statusRoutes } from './routes/status.js'
+import { teamRoutes } from './routes/team.js'
 import { createSocketServer } from './ws/hub.js'
 import { getDb, insertUser, userCount } from './db/index.js'
 import bcrypt from 'bcryptjs'
@@ -55,6 +56,7 @@ async function bootstrap() {
   await app.register(alertRoutes, { prefix: '/api/alerts' })
   await app.register(dockerRoutes, { prefix: '/api/docker' })
   await app.register(statusRoutes, { prefix: '/status' })
+  await app.register(teamRoutes, { prefix: '/api/team' })
 
   // Health check
   app.get('/health', async () => ({ ok: true, ts: Date.now() }))
