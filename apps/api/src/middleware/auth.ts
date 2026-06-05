@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import type { UserRole } from '@pulseos/types'
+import { getApiKeyByHash, touchApiKey } from '../db/index.js'
 
 interface JwtUser {
   sub: number
@@ -42,4 +43,20 @@ export async function requireOwner(req: FastifyRequest, reply: FastifyReply) {
     reply.code(401).send({ ok: false, error: 'unauthorized' })
     return
   }
+}
+
+export async function requireApiKey(req: FastifyRequest, reply: FastifyReply) {
+  const key = req.headers['x-api-key'] as string | undefined
+  if (!key) {
+    reply.code(401).send({ ok: false, error: 'api key required' })
+    return
+  }
+
+  const record = getApiKeyByHash(key)
+  if (!record) {
+    reply.code(401).send({ ok: false, error: 'invalid api key' })
+    return
+  }
+
+  touchApiKey(record.id)
 }
