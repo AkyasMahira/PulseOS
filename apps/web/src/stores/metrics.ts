@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type {
-  SystemSnapshot, ContainerMetric, ServiceStatus, ProcessInfo, AlertEvent, PageId
+  SystemSnapshot, ContainerMetric, ServiceStatus, ProcessInfo, AlertEvent, PageId, UserRole
 } from '@pulseos/types'
 
 interface MetricsStore {
@@ -74,23 +74,37 @@ export const useMetricsStore = create<MetricsStore>((set) => ({
 interface AuthStore {
   token: string | null
   username: string | null
-  setAuth: (token: string, username: string) => void
+  role: UserRole | null
+  setAuth: (token: string, username: string, role?: UserRole) => void
   clearAuth: () => void
+}
+
+function decodeRoleFromToken(token: string): UserRole | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.role ?? null
+  } catch {
+    return null
+  }
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
   token: typeof localStorage !== 'undefined' ? localStorage.getItem('pulse_token') : null,
   username: typeof localStorage !== 'undefined' ? localStorage.getItem('pulse_user') : null,
+  role: typeof localStorage !== 'undefined' ? (localStorage.getItem('pulse_role') as UserRole | null) : null,
 
-  setAuth: (token, username) => {
+  setAuth: (token, username, role) => {
+    const resolvedRole = role ?? decodeRoleFromToken(token)
     localStorage.setItem('pulse_token', token)
     localStorage.setItem('pulse_user', username)
-    set({ token, username })
+    if (resolvedRole) localStorage.setItem('pulse_role', resolvedRole)
+    set({ token, username, role: resolvedRole })
   },
 
   clearAuth: () => {
     localStorage.removeItem('pulse_token')
     localStorage.removeItem('pulse_user')
-    set({ token: null, username: null })
+    localStorage.removeItem('pulse_role')
+    set({ token: null, username: null, role: null })
   },
 }))

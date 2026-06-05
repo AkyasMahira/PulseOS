@@ -13,6 +13,9 @@ import { AlertsPage } from '../alerts/AlertsPage'
 import { SettingsPage } from '../alerts/SettingsPage'
 import { NetworkPage } from './NetworkPage'
 import { ProcessesPage } from '../services/ProcessesPage'
+import { ServersPage } from '../servers/ServersPage'
+import { TeamPage } from '../servers/TeamPage'
+import { ApiKeysPage } from '../saas/ApiKeysPage'
 import { fmtBytes, fmtBytesPerSec, fmtUptime, fmtPct } from '../../lib/utils'
 import { Cpu, HardDrive, ArrowDownUp, Clock, Activity, MemoryStick, Bell } from 'lucide-react'
 
@@ -77,6 +80,7 @@ export function Dashboard() {
   const PAGE_TITLES: Record<string, string> = {
     overview: 'Overview', containers: 'Containers', processes: 'Processes',
     network: 'Network', alerts: 'Alerts', history: 'Metrics History', settings: 'Settings',
+    servers: 'Servers', team: 'Team', apikeys: 'API Keys',
   }
 
   return (
@@ -115,6 +119,9 @@ export function Dashboard() {
           {currentPage === 'alerts'     && <AlertsPage />}
           {currentPage === 'history'    && <HistoryPage />}
           {currentPage === 'settings'   && <SettingsPage />}
+          {currentPage === 'servers'    && <ServersPage />}
+          {currentPage === 'team'       && <TeamPage />}
+          {currentPage === 'apikeys'    && <ApiKeysPage />}
         </div>
 
         {/* Footer */}

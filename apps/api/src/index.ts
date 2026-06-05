@@ -16,6 +16,10 @@ const PORT = parseInt(process.env.PORT ?? '3001')
 const HOST = process.env.HOST ?? '0.0.0.0'
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me'
 
+if (JWT_SECRET === 'dev-secret-change-me') {
+  console.warn('[pulseos] WARNING: Using default JWT secret. Set JWT_SECRET env var for production.')
+}
+
 async function bootstrap() {
   // Init DB
   getDb()
@@ -25,11 +29,11 @@ async function bootstrap() {
   const adminPass = process.env.ADMIN_PASS
   if (adminUser && adminPass && userCount() === 0) {
     const hashed = await bcrypt.hash(adminPass, 12)
-    insertUser(adminUser, hashed)
-    console.log(`[init] Created admin user: ${adminUser}`)
+    insertUser(adminUser, hashed, 'owner')
+    console.log(`[init] Created owner account: ${adminUser}`)
   }
 
-  const app = Fastify({ logger: { level: 'warn' }, trustProxy: true })
+  const app = Fastify({ logger: { level: 'warn' }, trustProxy: true, bodyLimit: 1_048_576 })
 
   // Plugins
   await app.register(FastifyCors, {

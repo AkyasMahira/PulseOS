@@ -1,7 +1,10 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { AlertRule, AlertEvent, HistoryPoint } from '@pulseos/types'
+import type {
+  AlertRule, AlertEvent, HistoryPoint, UserRole, TeamUser,
+  Invite, ServerConfig, ApiKey, Webhook, ApiKeyScope,
+} from '@pulseos/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DB_PATH = process.env.DB_PATH ?? path.join(__dirname, '../../data/pulseos.db')
@@ -72,6 +75,50 @@ function migrate(db: Database.Database) {
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       username     TEXT UNIQUE NOT NULL,
       password     TEXT NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+
+    -- Phase 3: add role, email, last_login_at columns to users (safe ALTER TABLE IF NOT EXISTS pattern)
+    ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';
+    ALTER TABLE users ADD COLUMN email TEXT;
+    ALTER TABLE users ADD COLUMN last_login_at INTEGER;
+
+    CREATE TABLE IF NOT EXISTS invites (
+      id           TEXT PRIMARY KEY,
+      email        TEXT NOT NULL,
+      role         TEXT NOT NULL DEFAULT 'viewer',
+      token        TEXT UNIQUE NOT NULL,
+      expires_at   INTEGER NOT NULL,
+      created_by   INTEGER NOT NULL,
+      created_at   INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS servers (
+      id           TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      host         TEXT NOT NULL,
+      api_url      TEXT NOT NULL,
+      api_token    TEXT NOT NULL,
+      tags         TEXT NOT NULL DEFAULT '[]',
+      added_at     INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id           TEXT PRIMARY KEY,
+      prefix       TEXT NOT NULL,
+      key_hash     TEXT UNIQUE NOT NULL,
+      scope        TEXT NOT NULL DEFAULT 'read',
+      created_by   INTEGER NOT NULL,
+      created_at   INTEGER NOT NULL,
+      last_used_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id           TEXT PRIMARY KEY,
+      url          TEXT NOT NULL,
+      events       TEXT NOT NULL,
+      secret       TEXT NOT NULL,
+      enabled      INTEGER NOT NULL DEFAULT 1,
       created_at   INTEGER NOT NULL
     );
   `)
@@ -151,16 +198,169 @@ export function getRecentAlerts(limit = 50): AlertEvent[] {
 // ── Users ────────────────────────────────────────────────────────────────────
 
 export function getUserByUsername(username: string) {
-  return getDb().prepare('SELECT * FROM users WHERE username = ?').get(username) as
-    { id: number; username: string; password: string } | undefined
+  return getDb().prepare(
+    'SELECT id, username, password, role, email, last_login_at, created_at FROM users WHERE username = ?'
+  ).get(username) as {
+    id: number; username: string; password: string; role: UserRole
+    email: string | null; last_login_at: number | null; created_at: number
+  } | undefined
 }
 
-export function insertUser(username: string, hashedPassword: string) {
+export function getUserById(id: number) {
+  return getDb().prepare(
+    'SELECT id, username, role, email, last_login_at, created_at FROM users WHERE id = ?'
+  ).get(id) as TeamUser | undefined
+}
+
+export function getAllUsers(): TeamUser[] {
+  return getDb().prepare(
+    'SELECT id, username, role, email, last_login_at, created_at FROM users ORDER BY created_at ASC'
+  ).all() as TeamUser[]
+}
+
+export function insertUser(username: string, hashedPassword: string, role: UserRole = 'admin', email: string | null = null) {
   getDb().prepare(
-    'INSERT INTO users (username, password, created_at) VALUES (?, ?, ?)'
-  ).run(username, hashedPassword, Date.now())
+    'INSERT INTO users (username, password, role, email, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(username, hashedPassword, role, email, Date.now())
+}
+
+export function updateUserRole(id: number, role: UserRole) {
+  getDb().prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id)
+}
+
+export function deleteUser(id: number) {
+  getDb().prepare('DELETE FROM users WHERE id = ?').run(id)
+}
+
+export function updateLastLogin(id: number) {
+  getDb().prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(Date.now(), id)
 }
 
 export function userCount(): number {
   return (getDb().prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c
+}
+
+// ── Invites ───────────────────────────────────────────────────────────────────
+
+export function createInvite(invite: Omit<Invite, 'id' | 'token' | 'createdAt'>): Invite {
+  const id = crypto.randomUUID()
+  const token = crypto.randomUUID().replace(/-/g, '')
+  const now = Date.now()
+  getDb().prepare(`
+    INSERT INTO invites (id, email, role, token, expires_at, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, invite.email, invite.role, token, invite.expiresAt, invite.createdBy, now)
+  return { ...invite, id, token, createdAt: now }
+}
+
+export function getInviteByToken(token: string): Invite | undefined {
+  const row = getDb().prepare(
+    'SELECT * FROM invites WHERE token = ? AND expires_at > ?'
+  ).get(token, Date.now()) as any
+  if (!row) return undefined
+  return {
+    id: row.id, email: row.email, role: row.role, token: row.token,
+    expiresAt: row.expires_at, createdBy: row.created_by, createdAt: row.created_at,
+  }
+}
+
+export function listInvites(): Invite[] {
+  return (getDb().prepare(
+    'SELECT * FROM invites WHERE expires_at > ? ORDER BY created_at DESC'
+  ).all(Date.now()) as any[]).map(r => ({
+    id: r.id, email: r.email, role: r.role, token: r.token,
+    expiresAt: r.expires_at, createdBy: r.created_by, createdAt: r.created_at,
+  }))
+}
+
+export function deleteInvite(id: string) {
+  getDb().prepare('DELETE FROM invites WHERE id = ?').run(id)
+}
+
+// ── Servers ───────────────────────────────────────────────────────────────────
+
+export function addServer(s: Omit<ServerConfig, 'id' | 'addedAt'>): ServerConfig {
+  const id = crypto.randomUUID()
+  const now = Date.now()
+  getDb().prepare(`
+    INSERT INTO servers (id, name, host, api_url, api_token, tags, added_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, s.name, s.host, s.apiUrl, s.apiToken, JSON.stringify(s.tags), now)
+  return { ...s, id, addedAt: now }
+}
+
+export function listServers(): ServerConfig[] {
+  return (getDb().prepare('SELECT * FROM servers ORDER BY added_at ASC').all() as any[]).map(r => ({
+    id: r.id, name: r.name, host: r.host, apiUrl: r.api_url,
+    apiToken: r.api_token, tags: JSON.parse(r.tags), addedAt: r.added_at,
+  }))
+}
+
+export function getServer(id: string): ServerConfig | undefined {
+  const r = getDb().prepare('SELECT * FROM servers WHERE id = ?').get(id) as any
+  if (!r) return undefined
+  return {
+    id: r.id, name: r.name, host: r.host, apiUrl: r.api_url,
+    apiToken: r.api_token, tags: JSON.parse(r.tags), addedAt: r.added_at,
+  }
+}
+
+export function removeServer(id: string) {
+  getDb().prepare('DELETE FROM servers WHERE id = ?').run(id)
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+export function createApiKey(prefix: string, keyHash: string, scope: ApiKeyScope, createdBy: number): ApiKey {
+  const id = crypto.randomUUID()
+  const now = Date.now()
+  getDb().prepare(`
+    INSERT INTO api_keys (id, prefix, key_hash, scope, created_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, prefix, keyHash, scope, createdBy, now)
+  return { id, prefix, scope, createdBy, createdAt: now, lastUsedAt: null }
+}
+
+export function listApiKeys(): ApiKey[] {
+  return (getDb().prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all() as any[]).map(r => ({
+    id: r.id, prefix: r.prefix, scope: r.scope,
+    createdBy: r.created_by, createdAt: r.created_at, lastUsedAt: r.last_used_at,
+  }))
+}
+
+export function getApiKeyByHash(keyHash: string) {
+  return getDb().prepare(
+    'SELECT * FROM api_keys WHERE key_hash = ?'
+  ).get(keyHash) as any
+}
+
+export function touchApiKey(id: string) {
+  getDb().prepare('UPDATE api_keys SET last_used_at = ? WHERE id = ?').run(Date.now(), id)
+}
+
+export function revokeApiKey(id: string) {
+  getDb().prepare('DELETE FROM api_keys WHERE id = ?').run(id)
+}
+
+// ── Webhooks ──────────────────────────────────────────────────────────────────
+
+export function createWebhook(url: string, events: string[], secret: string): Webhook {
+  const id = crypto.randomUUID()
+  const now = Date.now()
+  getDb().prepare(`
+    INSERT INTO webhooks (id, url, events, secret, enabled, created_at)
+    VALUES (?, ?, ?, ?, 1, ?)
+  `).run(id, url, JSON.stringify(events), secret, now)
+  return { id, url, events, secret, enabled: true, createdAt: now }
+}
+
+export function listWebhooks(): Webhook[] {
+  return (getDb().prepare('SELECT * FROM webhooks ORDER BY created_at DESC').all() as any[]).map(r => ({
+    id: r.id, url: r.url, events: JSON.parse(r.events),
+    secret: r.secret, enabled: r.enabled === 1, createdAt: r.created_at,
+  }))
+}
+
+export function deleteWebhook(id: string) {
+  getDb().prepare('DELETE FROM webhooks WHERE id = ?').run(id)
 }

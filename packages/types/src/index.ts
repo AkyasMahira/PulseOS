@@ -168,16 +168,79 @@ export interface StatusPage {
   overallStatus: 'operational' | 'degraded' | 'outage'
 }
 
-// Multi-server
+// ── RBAC ─────────────────────────────────────────────────────────────────────
+export type UserRole = 'owner' | 'admin' | 'viewer'
+
+// ── Multi-server ──────────────────────────────────────────────────────────────
 export interface ServerConfig {
   id: string
   name: string
   host: string
   apiUrl: string
-  token?: string
+  apiToken: string
   tags: string[]
   addedAt: number
 }
 
-// UI navigation state
-export type PageId = 'overview' | 'containers' | 'processes' | 'network' | 'alerts' | 'history' | 'settings'
+export interface RemoteServerStatus {
+  serverId: string
+  online: boolean
+  error?: string
+  snapshot?: SystemSnapshot
+  lastSeen: number
+}
+
+// ── Team / Invites ────────────────────────────────────────────────────────────
+export interface Invite {
+  id: string
+  email: string
+  role: UserRole
+  token: string
+  expiresAt: number
+  createdBy: number
+  createdAt: number
+}
+
+export interface TeamUser {
+  id: number
+  username: string
+  email: string | null
+  role: UserRole
+  lastLoginAt: number | null
+  createdAt: number
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+export type ApiKeyScope = 'read' | 'write' | 'admin'
+
+export interface ApiKey {
+  id: string
+  prefix: string
+  scope: ApiKeyScope
+  createdBy: number
+  createdAt: number
+  lastUsedAt: number | null
+}
+
+// ── Webhooks ──────────────────────────────────────────────────────────────────
+export interface Webhook {
+  id: string
+  url: string
+  events: string[]
+  secret: string
+  enabled: boolean
+  createdAt: number
+}
+
+// ── UI navigation state ───────────────────────────────────────────────────────
+export type PageId =
+  | 'overview'
+  | 'containers'
+  | 'processes'
+  | 'network'
+  | 'alerts'
+  | 'history'
+  | 'settings'
+  | 'servers'
+  | 'team'
+  | 'apikeys'
