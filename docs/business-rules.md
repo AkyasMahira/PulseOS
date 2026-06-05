@@ -17,7 +17,7 @@
 - **Status**: Implemented
 - Credentials verified with bcrypt (cost factor 12).
 - On success, returns a JWT signed with `JWT_SECRET`, expires in 7 days.
-- JWT payload contains: `{ sub: userId, username, role }`.
+- JWT payload contains: `{ sub: userId, username }` (no role — RBAC planned for Phase 3).
 - Failed login always returns the same error ("Invalid credentials") — no username enumeration.
 - `last_login_at` updated on each successful login.
 
@@ -29,17 +29,17 @@
 
 ---
 
-## 2. Role-Based Access Control
+## 2. Role-Based Access Control (📋 Planned — Phase 3)
 
 ### BR-RBAC-01 — Role Hierarchy
-- **Status**: Implemented
+- **Status**: Planned
 - Three roles: `owner` > `admin` > `viewer`.
 - `viewer`: Read-only. Can view all dashboards. Cannot perform actions (container restart, alerts, team management).
 - `admin`: Can perform all monitoring actions. Can invite users (viewer or admin role only). Cannot access billing. Cannot delete owner.
 - `owner`: Full access including billing, team management, deleting users, assigning any role.
 
 ### BR-RBAC-02 — Role Assignment Constraints
-- **Status**: Implemented
+- **Status**: Planned
 - Only `owner` can change user roles.
 - Only `owner` can delete users.
 - `owner` cannot delete themselves.
@@ -47,27 +47,26 @@
 - There is no restriction on multiple owners (any owner can promote another user to owner).
 
 ### BR-RBAC-03 — Billing Page Visibility
-- **Status**: Implemented (UI-only; not server-enforced)
+- **Status**: Planned
 - Billing page only shown in sidebar for `owner` role.
-- Backend billing endpoints do not check role — any authenticated user can technically reach them via direct API call.
+- Backend billing endpoints checked via role middleware.
 
 ---
 
-## 3. Team Invite Rules
+## 3. Team Invite Rules (📋 Planned — Phase 3)
 
 ### BR-TEAM-01 — Invite Lifecycle
-- **Status**: Partial (token works; email not sent)
+- **Status**: Planned
 - Invite token is valid for **48 hours** from creation.
 - Tokens are UUID-based (32 hex characters after dashes stripped).
 - Expired invites are automatically excluded from `listInvites()` query.
 - Accepting an invite deletes the invite record from the table.
-- Each invite is for a specific email address; the accept-invite page does not verify that the user provides the same email.
+- Each invite is for a specific email address.
 
 ### BR-TEAM-02 — Invite Delivery
-- **Status**: Not Implemented
+- **Status**: Planned
 - The API returns the invite URL in the response body.
-- Email sending is acknowledged as missing with a comment: "In production send email; for now return URL."
-- Frontend displays the URL in the UI for manual sharing.
+- Email sending requires nodemailer/SMTP integration.
 
 ---
 
@@ -125,75 +124,53 @@
 
 ---
 
-## 6. Multi-Server Rules
+## 6. Multi-Server Rules (📋 Planned — Phase 3)
 
 ### BR-SERVER-01 — Local Server
 - **Status**: Implemented
 - The local server is always present and is the primary monitored instance.
-- It is represented with `id: 'local'` in the frontend but is not stored in the `servers` table.
+- It is represented with `id: 'local'` in the frontend but is not stored in a `servers` table (as there is none yet).
 
 ### BR-SERVER-02 — Remote Servers
-- **Status**: Implemented (in-memory cache)
-- Remote servers are polled via HTTP GET to `{apiUrl}/api/metrics/now`.
+- **Status**: Planned
+- Remote servers will be polled via HTTP GET to `{apiUrl}/api/metrics/now`.
 - Authentication uses the stored `api_token` as a Bearer token.
-- Poll interval matches `COLLECT_INTERVAL_MS` (default 10s for remotes).
-- Remote server status is lost on API restart.
-- Remote metrics are **not** stored in `metrics_history` — no historical data for remote servers.
+- Poll interval matches `COLLECT_INTERVAL_MS`.
 
 ### BR-SERVER-03 — API Token Security
-- **Status**: Partial (security issue H-06)
-- `apiToken` is stored in the `servers` table.
-- It is currently returned in API responses — should be masked.
+- **Status**: Planned (not yet implemented — no server routes exist)
 
 ---
 
-## 7. Billing / Plan Rules
+## 7. Billing / Plan Rules (📋 Planned — Phase 4)
 
 ### BR-BILLING-01 — Plan Definitions
-- **Status**: Implemented (definitions only; limits not enforced)
-
-| Plan | Servers | Users | Retention | Alert Rules | Price |
-|---|---|---|---|---|---|
-| Free | 1 | 1 | 7 days | 3 | $0 |
-| Pro | 5 | 3 | 30 days | 20 | $9/mo |
-| Team | 20 | 10 | 90 days | ∞ | $29/mo |
-| Enterprise | ∞ | ∞ | 365 days | ∞ | Custom |
+- **Status**: Planned
 
 ### BR-BILLING-02 — Limit Enforcement
-- **Status**: Not Implemented
-- Plan limits are defined in the `PLANS` constant.
-- No API endpoint checks limits before allowing resource creation.
-- A Free plan user can add unlimited servers, users, and alert rules.
+- **Status**: Planned
 
 ### BR-BILLING-03 — Stripe Integration
-- **Status**: Partial
-- Checkout session creation: Implemented (requires `STRIPE_SECRET_KEY`).
-- Customer portal: Implemented (requires active Stripe subscription).
-- Webhook: Parses `customer.subscription.*` events but does not verify HMAC signature.
-- Default plan on fresh install: `free` (seeded via `INSERT OR IGNORE` in migration).
+- **Status**: Planned
 
 ### BR-BILLING-04 — Yearly Discount
-- **Status**: Implemented (pricing only)
-- Yearly pricing is approximately 20% less than monthly (12 × monthly vs `priceYearly`).
-- Pro: $9/mo monthly vs $7.20/mo yearly ($86.4/yr).
-- Team: $29/mo monthly vs $23.20/mo yearly ($278.4/yr).
+- **Status**: Planned (pricing only)
 
 ---
 
-## 8. API Key Rules
+## 8. API Key Rules (📋 Planned — Phase 3)
 
 ### BR-APIKEY-01 — Key Lifecycle
-- **Status**: Partial (CRUD works; auth not wired)
-- Keys are created with a `pk_` prefix followed by 32 hex characters.
-- The full key is returned **once** at creation time and never again.
-- `key_prefix` (first 10 chars) stored for display purposes.
-- Keys can be scoped: `read`, `write`, `admin`.
+- **Status**: Planned
+- Keys with `pk_` prefix, 32 hex characters.
+- Full key returned once at creation, never again.
+- `key_prefix` (first 10 chars) for display.
+- Keys scoped: `read`, `write`, `admin`.
 - Keys belong to the creating user.
 
 ### BR-APIKEY-02 — Key Authentication
-- **Status**: Not Implemented
-- `getApiKeyByRaw()` and `touchApiKey()` functions exist in `db/index.ts`.
-- No middleware reads the `x-api-key` header or authorizes requests using API keys.
+- **Status**: Planned
+- Requires `api_keys` table + auth middleware checking `x-api-key` header.
 
 ---
 

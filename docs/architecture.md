@@ -34,11 +34,8 @@ pulseos/                          # Monorepo root
 │   │       │   ├── auth.ts       # /api/auth — login, setup, /me
 │   │       │   ├── metrics.ts    # /api/metrics — /now, /history, /api/alerts
 │   │       │   ├── docker.ts     # /api/docker — list, actions, logs
-│   │       │   ├── team.ts       # /api/team — users, invites, roles
-│   │       │   ├── servers.ts    # /api/servers — remote server registry + polling
-│   │       │   ├── apikeys.ts    # /api/keys, /api/webhooks — CRUD
-│   │       │   ├── billing.ts    # /api/billing — plans, checkout, webhook
 │   │       │   └── status.ts     # /status — public, no auth
+│   │       │   └── (planned)     # team.ts, servers.ts, apikeys.ts, billing.ts for Phase 3-4
 │   │       └── ws/
 │   │           └── hub.ts        # Socket.IO server + collection loop
 │   │
@@ -46,12 +43,11 @@ pulseos/                          # Monorepo root
 │       └── src/
 │           ├── pages/
 │           │   ├── index.astro       # Shell → <App client:only="react" />
-│           │   ├── status.astro      # Public status page (vanilla JS)
-│           │   └── accept-invite.astro # Invite acceptance (vanilla JS)
+│           │   └── status.astro      # Public status page (vanilla JS)
 │           ├── components/
 │           │   ├── App.tsx           # Auth gate → Dashboard or LoginPage
 │           │   ├── layout/
-│           │   │   ├── Sidebar.tsx   # Navigation, role-filtered, badges
+│           │   │   ├── Sidebar.tsx   # Navigation, badges, sign-out
 │           │   │   └── Topbar.tsx    # Header, connection status
 │           │   ├── dashboard/
 │           │   │   ├── Dashboard.tsx # Page router (currentPage → component)
@@ -68,12 +64,6 @@ pulseos/                          # Monorepo root
 │           │   │   ├── ServicesTable.tsx
 │           │   │   ├── ProcessTable.tsx
 │           │   │   └── ProcessesPage.tsx
-│           │   ├── servers/
-│           │   │   ├── ServersPage.tsx
-│           │   │   └── TeamPage.tsx
-│           │   └── saas/
-│           │       ├── BillingPage.tsx
-│           │       └── ApiKeysPage.tsx
 │           ├── hooks/useSocket.ts    # Socket.IO connection + store wiring
 │           ├── stores/metrics.ts     # Zustand — all live state
 │           └── lib/utils.ts         # fmtBytes, fmtUptime, fmtPct, etc.
@@ -173,16 +163,17 @@ Client POST /api/docker/:id/restart
 ## SQLite Schema
 
 ```sql
-metrics_history  (id, ts, server_id, cpu, mem_used, mem_total, net_rx, net_tx)
-disk_history     (id, ts, server_id, mountpoint, used, total)    ← never written
-alert_rules      (id, name, metric, condition, threshold, severity, channels, cooldown, enabled, server_id, created_at)
-alert_events     (id, rule_id, rule_name, severity, message, value, threshold, server_id, fired_at, resolved_at)
-users            (id, username, email, password, role, last_login_at, created_at)
-invites          (id, email, role, token, expires_at, created_by, created_at)
-servers          (id, name, host, api_url, api_token, tags, enabled, added_at)
-api_keys         (id, name, key_hash, key_prefix, scopes, user_id, last_used_at, expires_at, created_at)
-webhooks         (id, name, url, events, secret, enabled, created_at)
-subscription     (id=1, plan_id, status, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id, updated_at)
+metrics_history  (id, ts, cpu, mem_used, mem_total, net_rx, net_tx)
+disk_history     (id, ts, mountpoint, used, total)    ← created but never written
+alert_rules      (id, name, metric, condition, threshold, severity, channels, cooldown, enabled, created_at)
+alert_events     (id, rule_id, rule_name, severity, message, value, threshold, fired_at, resolved_at)
+users            (id, username, password, created_at)
+
+-- Planned (Phase 3-4):
+-- users: add email, role, last_login_at columns
+-- NEW tables: invites, servers, api_keys, webhooks, subscription
+-- metrics_history/disk_history: add server_id column
+-- alert_rules: add server_id column
 ```
 
 ---
@@ -193,13 +184,13 @@ subscription     (id=1, plan_id, status, current_period_end, cancel_at_period_en
 |---|---|---|---|
 | Telegram Bot API | HTTPS POST | Outbound | ✅ Implemented |
 | Discord Webhook | HTTPS POST | Outbound | ✅ Implemented |
-| Stripe Checkout API | HTTPS POST | Outbound | ✅ Implemented |
-| Stripe Customer Portal | HTTPS POST | Outbound | ✅ Implemented |
-| Stripe Webhook | HTTPS POST | Inbound | ⚠️ Signature not verified |
-| Remote PulseOS instances | HTTPS GET | Outbound | ✅ Implemented (in-memory only) |
 | Docker daemon | Unix socket | Local | ✅ Implemented |
 | PM2 | Child process exec | Local | ✅ Implemented |
 | systemd | Child process exec | Local | ✅ Implemented |
+| Stripe Checkout API | HTTPS POST | Outbound | 📋 Planned (Phase 4) |
+| Stripe Customer Portal | HTTPS POST | Outbound | 📋 Planned (Phase 4) |
+| Stripe Webhook | HTTPS POST | Inbound | 📋 Planned (Phase 4) |
+| Remote PulseOS instances | HTTPS GET | Outbound | 📋 Planned (Phase 3) |
 | Email / SMTP | — | — | ❌ Not implemented |
 
 ---

@@ -76,27 +76,31 @@
 
 ---
 
-## D-07 — JWT Embedded Role Claim
+## D-07 — JWT Embedded Role Claim (📋 Planned)
 
-**Decision**: Embed `role` in the JWT payload rather than fetching it from DB on each request.
+**Decision (Planned)**: Embed `role` in the JWT payload rather than fetching it from DB on each request.
 
 **Reason**: Avoids DB lookup on every authenticated request. Simplifies middleware.
 
-**Evidence**: `routes/auth.ts` — `app.jwt.sign({ sub: user.id, username, role: user.role }, ...)`. `routes/team.ts` — `req.user.role` used directly without DB lookup.
+**Current State**: JWT payload is `{ sub: number, username: string }` — no role claim. `users` table has no `role` column. RBAC system is not yet implemented (planned for Phase 3).
 
-**Impact**: Role changes don't take effect until user re-authenticates (token expiry or re-login). Acceptable for 7-day JWT expiry in a small team context. Frontend reads role from JWT payload directly: `JSON.parse(atob(token.split('.')[1])).role`.
+**Evidence (planned)**: Will need: `app.jwt.sign({ sub: user.id, username, role: user.role }, ...)` in `routes/auth.ts`. Frontend will read role from JWT payload via `JSON.parse(atob(token.split('.')[1])).role`.
+
+**Impact (planned)**: Role changes won't take effect until user re-authenticates (token expiry or re-login). Acceptable for 7-day JWT expiry in a small team context.
 
 ---
 
-## D-08 — In-Memory Remote Server Cache
+## D-08 — In-Memory Remote Server Cache (📋 Planned)
 
-**Decision**: Cache remote server snapshots in a `Map` (`remoteCache`) in API process memory rather than persisting to SQLite.
+**Decision (Planned)**: Cache remote server snapshots in a `Map` (`remoteCache`) in API process memory rather than persisting to SQLite.
 
 **Reason**: Simplifies implementation. Remote snapshots are ephemeral — stale on restart is acceptable.
 
-**Evidence**: `routes/servers.ts:7` — `const remoteCache = new Map<string, RemoteServerStatus>()`. No DB insert for remote metrics.
+**Current State**: Not yet implemented. No `routes/servers.ts` file exists. Planned for Phase 3.
 
-**Impact**: Remote server status is lost on API restart. No historical data for remote servers. Monitoring remote servers from history page shows no data.
+**Evidence (planned)**: Will create `const remoteCache = new Map<string, RemoteServerStatus>()` in `routes/servers.ts`. No DB insert for remote metrics.
+
+**Impact (planned)**: Remote server status lost on API restart. No historical data for remote servers.
 
 ---
 
@@ -112,12 +116,12 @@
 
 ---
 
-## D-10 — Plan Definitions as Code Constants
+## D-10 — Plan Definitions as Code Constants (📋 Planned)
 
-**Decision**: Billing plan definitions (`PLANS` constant) live in `routes/billing.ts` as a TypeScript constant, not in the database.
+**Decision (Planned)**: Billing plan definitions (`PLANS` constant) will live in `routes/billing.ts` as a TypeScript constant, not in the database.
 
 **Reason**: Plans rarely change. Avoids DB seeding complexity. Easy to modify in code for self-hosted users who want custom limits.
 
-**Evidence**: `routes/billing.ts:7-30` — `export const PLANS: Record<PlanId, Plan> = { free: {...}, pro: {...}, ... }`.
+**Current State**: Not yet implemented. No `routes/billing.ts` file exists. No `subscription` table. Planned for Phase 4.
 
-**Impact**: Plan changes require API redeployment. Cannot be changed at runtime. Self-hosters can easily override limits by editing the file.
+**Impact (planned)**: Plan changes require API redeployment. Cannot be changed at runtime. Self-hosters can easily override limits by editing the file.

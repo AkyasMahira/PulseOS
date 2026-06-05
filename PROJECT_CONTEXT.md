@@ -22,17 +22,15 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint |
 | **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query |
 | **Docker Routes** | `routes/docker.ts` | Container list, start/stop/restart/remove, log streaming |
-| **Team Routes** | `routes/team.ts` | CRUD for users, invite generation, role assignment |
-| **Servers Routes** | `routes/servers.ts` | Remote server registry + in-memory polling cache |
-| **Billing Routes** | `routes/billing.ts` | Plan definitions, Stripe checkout/portal, webhook handler |
-| **API Keys Routes** | `routes/apikeys.ts` | API key CRUD + webhook CRUD |
 | **Status Route** | `routes/status.ts` | Public unauthenticated status page data |
+
+> 📋 **Planned (Phase 3-4)**: `routes/team.ts`, `routes/servers.ts`, `routes/billing.ts`, `routes/apikeys.ts`
 
 ### Frontend (`apps/web`)
 
 | Module | Files | Purpose |
 |---|---|---|
-| **State** | `stores/metrics.ts` | Zustand store — live metrics, page navigation, auth token, remote servers, billing, team |
+| **State** | `stores/metrics.ts` | Zustand store — live metrics, page navigation, auth token |
 | **Socket Hook** | `hooks/useSocket.ts` | Connects to Socket.IO, feeds all events into store |
 | **Router** | `components/dashboard/Dashboard.tsx` | Page-level router using `currentPage` from store |
 | **Overview** | `Dashboard.tsx > OverviewPage` | Main dashboard with MetricCards + SparkLines + ServicesTable + ProcessTable |
@@ -41,11 +39,9 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Network** | `dashboard/NetworkPage.tsx` | Per-interface bandwidth breakdown |
 | **History** | `history/HistoryPage.tsx` | Time-series charts with range selector (1h/6h/24h/7d) |
 | **Alerts** | `alerts/AlertsPage.tsx` | Alert events feed + rule management |
-| **Servers** | `servers/ServersPage.tsx` | Multi-server overview cards + add form |
-| **Team** | `servers/TeamPage.tsx` | User list, invite form, role assignment |
-| **Billing** | `saas/BillingPage.tsx` | Plan grid, usage meters, Stripe checkout redirect |
-| **API Keys** | `saas/ApiKeysPage.tsx` | Key creation with one-time reveal, revocation |
-| **Settings** | `alerts/SettingsPage.tsx` | Server info, notification config, API reference |
+| **Settings** | `alerts/SettingsPage.tsx` | Server info, notification config |
+
+> 📋 **Planned (Phase 3-4)**: `servers/ServersPage.tsx`, `servers/TeamPage.tsx`, `saas/BillingPage.tsx`, `saas/ApiKeysPage.tsx`
 
 ### Shared Types (`packages/types`)
 
@@ -53,7 +49,9 @@ Single file `src/index.ts` exports all interfaces shared between frontend and ba
 
 ---
 
-## User Roles
+## User Roles (📋 Planned — not yet implemented)
+
+> Role-based access control is planned for Phase 3. Current code has no role system — all authenticated users have equal access.
 
 | Role | Permissions |
 |---|---|
@@ -61,7 +59,7 @@ Single file `src/index.ts` exports all interfaces shared between frontend and ba
 | `admin` | All monitoring features, container actions, invite users, manage alerts. Cannot access billing or delete owner |
 | `viewer` | Read-only — can view all dashboards, cannot perform actions or manage team |
 
-Role is embedded in the JWT payload. Frontend enforces UI-level restrictions. Backend enforces server-side via `requireAdmin`/`requireOwner` middleware.
+Key implementation requirements: `role` column on `users` table, `role` claim in JWT payload, role-check middleware, role-filtered sidebar navigation.
 
 ---
 
@@ -81,19 +79,19 @@ Role is embedded in the JWT payload. Frontend enforces UI-level restrictions. Ba
 5. If threshold crossed and cooldown elapsed → `fireAlert()` → DB insert + Socket.IO broadcast + Telegram/Discord
 6. All 4 metric payloads broadcast via `io.emit()` to all authenticated WS clients
 
-### Remote Server Polling
+### Remote Server Polling (📋 Planned — Phase 3)
 1. `startRemotePolling()` called on boot — polls all servers in `servers` table
 2. Each remote server polled via `fetch(apiUrl/api/metrics/now)` with stored API token
 3. Results cached in `remoteCache` Map (in-memory, resets on restart)
 4. Frontend fetches `/api/servers` REST endpoint (not WS) to display server cards
 
-### Team Invite Flow
+### Team Invite Flow (📋 Planned — Phase 3)
 1. Admin/owner POSTs to `/api/team/invite` with `{ email, role }`
 2. Token stored in `invites` table (48h expiry)
 3. Invite URL returned in API response (email sending NOT implemented — URL shown in UI)
 4. Invitee visits `/accept-invite?token=xxx` → sets username/password → account created → redirected to dashboard
 
-### Billing / Upgrade Flow
+### Billing / Upgrade Flow (📋 Planned — Phase 4)
 1. User navigates to Billing page → plans fetched from `/api/billing/plans` (static data from `PLANS` constant)
 2. Click upgrade → POST `/api/billing/checkout` → Stripe Checkout session created → redirect
 3. Stripe webhook hits `/api/billing/webhook` → `updateSubscription()` updates SQLite
@@ -113,12 +111,11 @@ db/index.ts (SQLite)
 alerts.ts → checks rules from DB → fires to Telegram/Discord + Socket.IO
 
 routes/* → all read from db/index.ts
-routes/servers.ts → maintains in-memory remoteCache, polls remote PulseOS instances
 
 Frontend:
 useSocket.ts → feeds → useMetricsStore (Zustand)
 Dashboard.tsx → reads store → renders current page component
-All page components → fetch REST APIs for non-live data (history, team, billing)
+All page components → fetch REST APIs for non-live data (history)
 ```
 
 ---
@@ -140,9 +137,8 @@ All page components → fetch REST APIs for non-live data (history, team, billin
 | `TELEGRAM_BOT_TOKEN` | — | Telegram alerts |
 | `TELEGRAM_CHAT_ID` | — | Telegram alerts |
 | `DISCORD_WEBHOOK_URL` | — | Discord alerts |
-| `WEB_ORIGIN` | `http://localhost:4321` | CORS + invite URLs |
-| `STRIPE_SECRET_KEY` | — | Billing (Phase 4) |
-| `STRIPE_WEBHOOK_SECRET` | — | Billing webhook |
-| `STRIPE_PRICE_*` | — | Plan price IDs |
+| `WEB_ORIGIN` | `http://localhost:4321` | CORS |
 | `STATUS_PAGE_TITLE` | `System Status` | Public status page |
 | `DB_PATH` | `apps/api/data/pulseos.db` | SQLite location |
+
+> 📋 **Planned (Phase 4)**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`

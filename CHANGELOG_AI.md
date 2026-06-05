@@ -1,6 +1,7 @@
 # CHANGELOG_AI.md — PulseOS Development History
 
-> AI-generated changelog from repository analysis. No git history available — reconstructed from code evidence.
+> Verified against actual codebase on 2025-06-02. Statuses reflect code evidence, not aspirational documentation.
+> Features marked "Planned" or "Not Implemented" do not exist in the codebase.
 
 ---
 
@@ -29,9 +30,9 @@
 - Notes: 6 metric cards, 4 sparkline charts (60-point rolling history), ServicesTable, ProcessTable. Alert banner shows latest unresolved alert.
 
 **Authentication (JWT)**
-- Status: ✅ Fully implemented
-- Files: `routes/auth.ts`, `middleware/auth.ts`, `stores/metrics.ts`
-- Notes: First-run setup endpoint, login, JWT with role embedded. 7-day expiry. bcrypt with cost factor 12. `localStorage` token persistence.
+- Status: ✅ Implemented
+- Files: `routes/auth.ts`, `middleware/auth.ts`
+- Notes: First-run setup endpoint, login, JWT with `{ sub, username }` (no role). 7-day expiry. bcrypt cost 12. `localStorage` persistence. No RBAC — all users are equal. `users` table has only `id, username, password, created_at`.
 
 ### Phase 2 — Docker + Alerts + History
 
@@ -48,7 +49,7 @@
 **History Charts**
 - Status: ✅ Fully implemented
 - Files: `routes/metrics.ts`, `components/history/HistoryPage.tsx`
-- Notes: 4 metrics (cpu, mem, net_rx, net_tx), 4 time ranges (1h/6h/24h/7d), min/max/avg stats. REST polling (not WS). `server_id` filtering supported in DB layer.
+- Notes: 4 metrics (cpu, mem, net_rx, net_tx), 4 time ranges (1h/6h/24h/7d), min/max/avg stats. REST polling (not WS). Single-server only.
 
 **Services Monitoring**
 - Status: ✅ Implemented
@@ -70,34 +71,34 @@
 - Files: `routes/status.ts`, `pages/status.astro`
 - Notes: No auth required. CORS `*`. Auto-refresh 30s. Calculates 7d uptime from alert_events table. Shows incidents. Pure vanilla JS in Astro page.
 
-### Phase 3 — Multi-Server + Team
+### Phase 3 — Multi-Server + Team 📋 Planned
 
 **Multi-Server Support**
-- Status: ✅ Implemented (with in-memory cache limitation)
-- Files: `routes/servers.ts`, `components/servers/ServersPage.tsx`
-- Notes: Remote servers polled via HTTP. Results cached in `Map`. Cache lost on restart. Local server always shown as first card. Server cards show CPU/RAM/Disk meters.
+- Status: 📋 Planned — not yet implemented
+- Files: (planned) `routes/servers.ts`, `components/servers/ServersPage.tsx`
+- Notes: Remote servers polled via HTTP. Results cached in `Map`. Cache lost on restart. Local server always shown as first card. Server cards show CPU/RAM/Disk meters. Requires `servers` table + `remoteCache` in route handler.
 
 **Team Management + RBAC**
-- Status: ✅ Implemented
-- Files: `routes/team.ts`, `components/servers/TeamPage.tsx`, `pages/accept-invite.astro`
-- Notes: 3 roles (owner/admin/viewer). Invite via token (48h expiry). Accept-invite page. Role change + user delete. Role encoded in JWT.
+- Status: 📋 Planned — not yet implemented
+- Files: (planned) `routes/team.ts`, `components/servers/TeamPage.tsx`, `pages/accept-invite.astro`
+- Notes: 3 roles (owner/admin/viewer). Invite via token (48h expiry). Accept-invite page. Role change + user delete. Requires: `role`, `email`, `last_login_at` columns on `users` table; `invites` table; JWT payload extended with `role`.
 
 **API Keys**
-- Status: ✅ CRUD implemented; auth middleware NOT wired
-- Files: `routes/apikeys.ts`, `db/index.ts`, `components/saas/ApiKeysPage.tsx`
-- Notes: Keys created, stored, revoked. One-time reveal on creation. `getApiKeyByRaw()` + `touchApiKey()` exist but are never called by auth middleware.
+- Status: 📋 Planned — not yet implemented
+- Files: (planned) `routes/apikeys.ts`, `components/saas/ApiKeysPage.tsx`
+- Notes: Keys created, stored, revoked. One-time reveal on creation. Requires `api_keys` table + auth middleware that checks `x-api-key` header.
 
 **Webhooks**
-- Status: ⚠️ Partially implemented — CRUD only, delivery NOT implemented
-- Files: `routes/apikeys.ts`, `db/index.ts`
-- Notes: Webhooks can be created/deleted/listed. The `listWebhooks()` function is never called by the alert engine or any trigger.
+- Status: 📋 Planned — not yet implemented
+- Files: (planned) `routes/apikeys.ts`, `db/index.ts`
+- Notes: Webhooks can be created/deleted/listed. Trigger in alert engine via `listWebhooks()`. Requires `webhooks` table.
 
-### Phase 4 — Billing / SaaS
+### Phase 4 — Billing / SaaS 📋 Planned
 
 **Billing / Stripe**
-- Status: ⚠️ Partially implemented — structure complete, not production-ready
-- Files: `routes/billing.ts`, `components/saas/BillingPage.tsx`
-- Notes: Plan definitions (`PLANS` constant) complete. Stripe Checkout session creation works if `STRIPE_SECRET_KEY` set. Customer portal redirect works. Stripe webhook handler parses events but **signature verification is a stub** (comment: "simplified — in prod use stripe SDK"). Plan limits NOT enforced on any API endpoint.
+- Status: 📋 Planned — not yet implemented
+- Files: (planned) `routes/billing.ts`, `components/saas/BillingPage.tsx`
+- Notes: Plan definitions (`PLANS` constant). Stripe Checkout session creation. Customer portal redirect. Stripe webhook handler. Requires `subscription` table, Stripe SDK integration, HMAC signature verification. Plan limits NOT enforced on any API endpoint.
 
 ---
 
@@ -106,37 +107,43 @@
 | Feature | What Works | What's Missing | File |
 |---|---|---|---|
 | Alert resolution | Alerts fired and stored | `resolvedAt` never set — alerts never auto-resolve | `alerts.ts` |
-| Webhook delivery | CRUD, storage | Webhook trigger in alert engine | `alerts.ts`, `routes/apikeys.ts` |
-| API key auth | Key creation/storage | Middleware to authenticate requests with API keys | `middleware/auth.ts` |
-| Plan limit enforcement | Plan definitions, UI display | Server-side checks on server/user/rule limits | `routes/billing.ts` |
-| Stripe webhook signature | Event parsing | HMAC verification with `STRIPE_WEBHOOK_SECRET` | `routes/billing.ts:137` |
-| Email invites | Invite token + DB | Actual email sending (nodemailer/SMTP) | `routes/team.ts:42` |
 | Disk history | Table + index exist, pruning works | INSERT never called (data never written) | `db/index.ts`, `ws/hub.ts` |
 | `@fastify/websocket` dep | Listed in package.json | Not used — Socket.IO used instead | `package.json` |
 | Email alerts channel | Defined in `AlertChannel` type | No implementation in `alerts.ts` | `alerts.ts` |
-| SSO/SAML | Listed as Enterprise feature | Not started | — |
-| Password reset | — | Not implemented | — |
+
+## Planned Features 📋
+
+| Feature | Planned Files | Notes |
+|---|---|---|
+| Multi-server support | `routes/servers.ts`, `ServersPage.tsx` | Remote servers via HTTP polling, in-memory cache |
+| Team management + RBAC | `routes/team.ts`, `TeamPage.tsx`, `accept-invite.astro` | Roles (owner/admin/viewer), invites, JWT role claim |
+| API keys | `routes/apikeys.ts`, `ApiKeysPage.tsx` | CRUD + auth middleware; requires `api_keys` table |
+| Webhook delivery | `routes/apikeys.ts`, `alerts.ts` | CRUD + trigger in alert engine; requires `webhooks` table |
+| Billing / Stripe | `routes/billing.ts`, `BillingPage.tsx` | Plans, checkout, webhook handler; requires `subscription` table |
+| Email invites | `routes/team.ts` | SMTP/nodemailer integration |
+| SSO/SAML | — | Enterprise plan feature |
+| Password reset | — | Forgot-password flow, reset tokens | |
 
 ---
 
 ## Refactored Components
 
-**DB module** — Evolved from basic 3-table schema to 10-table schema across phases. Column `server_id` added to `metrics_history` and `disk_history` for multi-server support. Users table extended with `email`, `role`, `last_login_at`.
+**DB module** — Current schema: 5 tables (`metrics_history`, `disk_history`, `alert_rules`, `alert_events`, `users`). Users table has `id, username, password, created_at`. No `server_id`, role, email, or multi-tenant columns.
 
-**Auth routes** — Upgraded from basic login to include `role` in JWT payload and optional `email` in setup.
+**Auth routes** — Provides login and first-run setup. JWT payload: `{ sub, username }`. No role or email in JWT. No password reset.
 
-**Sidebar** — Rebuilt twice: first as static nav, then as data-driven nav with role-based visibility (`ownerOnly` flag), badge counters, and sign-out button.
+**Sidebar** — Data-driven navigation with 7 pages (Overview, Containers, Processes, Network, Alerts, History, Settings). Badge counters for alerts and offline services. Hardcoded "admin" role label — no role-based filtering (planned for Phase 3).
 
-**Dashboard** — Refactored from monolithic component to page router pattern using `currentPage` Zustand state.
+**Dashboard** — Page router pattern using `currentPage` Zustand state. `PAGE_TITLES` map for all 7 pages.
 
 ---
 
 ## Known Limitations
 
 1. **Linux-only**: All collectors depend on `/proc` filesystem and Linux-specific commands. Will fail on macOS/Windows.
-2. **No horizontal scaling**: SQLite + in-memory caches (alert cooldowns, remote server cache) prevent multi-instance deployment.
-3. **JWT-only auth**: No session invalidation mechanism. Logout is client-side only (removes token from localStorage).
-4. **Single-tenant SQLite**: All users share one database. No data isolation between tenants (relevant for SaaS path).
-5. **Remote server metrics not in SQLite**: Only local server metrics are persisted. Remote server metrics exist only in `remoteCache`.
+2. **No RBAC**: All authenticated users have equal access. No role-based access control. Users table has no `role` column.
+3. **No horizontal scaling**: SQLite + in-memory caches (alert cooldowns) prevent multi-instance deployment.
+4. **JWT-only auth**: No session invalidation mechanism. Logout is client-side only (removes token from localStorage).
+5. **Single-tenant SQLite**: All users share one database. No data isolation between tenants (relevant for SaaS path).
 6. **No test suite**: Zero tests across entire codebase.
 7. **No input sanitization layer**: Route handlers validate presence but not format/content of inputs beyond Fastify's JSON schema on login.

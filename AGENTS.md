@@ -101,8 +101,8 @@ pulseos/
 1. **Linux-only collectors**: All `apps/api/src/collectors/` files read from `/proc/*` and `/etc/hostname`. They will FAIL on macOS/Windows. Wrap in try/catch with fallbacks (already done in `collectors/index.ts`).
 2. **Single SQLite instance**: `getDb()` returns a singleton. Never create a second Database instance.
 3. **No migrations system**: `migrate()` uses `CREATE IF NOT EXISTS`. Adding columns to existing tables requires `ALTER TABLE` statements appended to `migrate()`.
-4. **Remote server cache is in-memory**: `remoteCache` in `routes/servers.ts` resets on API restart. This is intentional for MVP.
-5. **JWT payload shape**: `{ sub: number, username: string, role: UserRole }` — role is embedded. Changing this shape breaks frontend role checks in `Sidebar.tsx` (reads `atob(token.split('.')[1])`).
+4. **No RBAC (Planned)**: Current code has no role system. `users` table is `(id, username, password, created_at)`. Role-based access control (owner/admin/viewer) is planned for Phase 3.
+5. **JWT payload shape**: `{ sub: number, username: string }` — role is NOT currently embedded. Adding a role claim requires updating JWT sign in `auth.ts`, DB schema, and all role checks. Planned for Phase 3.
 6. **Astro output is static**: `output: 'static'` in `astro.config.mjs`. All data fetching happens client-side.
 
 ---
