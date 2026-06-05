@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { getMetricsHistory, getRecentAlerts, getAlertRules, insertAlertRule } from '../db/index.js'
 import { collectAll } from '../collectors/index.js'
 
@@ -40,9 +40,9 @@ export async function alertRoutes(app: FastifyInstance) {
   })
 
   // POST /api/alerts/rules
-  app.post<{ Body: any }>('/rules', { preHandler: requireAuth }, async (req, reply) => {
+  app.post<{ Body: any }>('/rules', { preHandler: requireAdmin }, async (req, reply) => {
     try {
-      const id = insertAlertRule(req.body)
+      const id = insertAlertRule(req.body as any)
       return { ok: true, data: { id } }
     } catch (e) {
       return reply.code(400).send({ ok: false, error: String(e) })
