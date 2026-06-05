@@ -9,6 +9,7 @@ import { metricsRoutes, alertRoutes } from './routes/metrics.js'
 import { dockerRoutes } from './routes/docker.js'
 import { statusRoutes } from './routes/status.js'
 import { teamRoutes } from './routes/team.js'
+import { serversRoutes, startRemotePolling } from './routes/servers.js'
 import { createSocketServer } from './ws/hub.js'
 import { getDb, insertUser, userCount } from './db/index.js'
 import bcrypt from 'bcryptjs'
@@ -57,6 +58,7 @@ async function bootstrap() {
   await app.register(dockerRoutes, { prefix: '/api/docker' })
   await app.register(statusRoutes, { prefix: '/status' })
   await app.register(teamRoutes, { prefix: '/api/team' })
+  await app.register(serversRoutes, { prefix: '/api/servers' })
 
   // Health check
   app.get('/health', async () => ({ ok: true, ts: Date.now() }))
@@ -65,6 +67,8 @@ async function bootstrap() {
   const httpServer = createServer(app.server)
   // Socket.IO attaches to existing server
   createSocketServer(app.server as any, JWT_SECRET)
+
+  startRemotePolling(parseInt(process.env.COLLECT_INTERVAL_MS ?? '5000'))
 
   await app.listen({ port: PORT, host: HOST })
   console.log(`[pulseos] API running on http://${HOST}:${PORT}`)
