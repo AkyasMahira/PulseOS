@@ -1,5 +1,5 @@
 import type { SystemSnapshot, ServiceStatus, AlertRule, AlertEvent } from '@pulseos/types'
-import { getAlertRules, insertAlertEvent } from './db/index.js'
+import { getAlertRules, insertAlertEvent, listWebhooks } from './db/index.js'
 
 const lastFired = new Map<string, number>()
 
@@ -78,6 +78,30 @@ async function fireAlert(rule: AlertRule, value: number, message: string) {
       return Promise.resolve()
     })
   )
+
+  const webhooks = listWebhooks()
+  if (webhooks.length > 0) {
+    const payload = JSON.stringify({
+      event: 'alert:fired',
+      rule: { id: rule.id, name: rule.name, severity: rule.severity, metric: rule.metric },
+      value: event.value,
+      threshold: event.threshold,
+      message: event.message,
+      firedAt: event.firedAt,
+    })
+
+    await Promise.allSettled(
+      webhooks
+        .filter(w => w.enabled && w.events.includes('alert:fired'))
+        .map(w =>
+          fetch(w.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Webhook-Secret': w.secret },
+            body: payload,
+          }).catch(e => console.error(`[webhook] ${w.url} error:`, e))
+        )
+    )
+  }
 }
 
 export async function evaluateAlerts(snapshot: SystemSnapshot, services: ServiceStatus[]) {

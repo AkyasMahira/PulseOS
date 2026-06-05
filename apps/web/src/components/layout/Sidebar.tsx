@@ -1,12 +1,12 @@
 import { useMetricsStore } from '../../stores/metrics'
-import type { PageId } from '@pulseos/types'
+import type { PageId, UserRole } from '@pulseos/types'
 import {
   LayoutDashboard, Container, Cpu, Activity, Bell,
-  BarChart2, Settings, Globe, LogOut
+  BarChart2, Settings, LogOut, Server, Users, Key
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/metrics'
 
-const NAV: { id: PageId; label: string; icon: any; section?: string }[] = [
+const NAV: { id: PageId; label: string; icon: any; section?: string; requireRole?: UserRole[] }[] = [
   { id: 'overview',    label: 'Overview',    icon: LayoutDashboard, section: 'Monitor' },
   { id: 'containers',  label: 'Containers',  icon: Container },
   { id: 'processes',   label: 'Processes',   icon: Cpu },
@@ -14,11 +14,20 @@ const NAV: { id: PageId; label: string; icon: any; section?: string }[] = [
   { id: 'alerts',      label: 'Alerts',      icon: Bell, section: 'Manage' },
   { id: 'history',     label: 'History',     icon: BarChart2 },
   { id: 'settings',    label: 'Settings',    icon: Settings, section: 'System' },
+  { id: 'servers',     label: 'Servers',     icon: Server, requireRole: ['owner', 'admin'] },
+  { id: 'team',        label: 'Team',        icon: Users, requireRole: ['owner', 'admin'] },
+  { id: 'apikeys',     label: 'API Keys',    icon: Key, requireRole: ['owner', 'admin'] },
 ]
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  owner: 'owner',
+  admin: 'admin',
+  viewer: 'viewer',
+}
 
 export function Sidebar() {
   const { currentPage, setPage, alerts, services } = useMetricsStore()
-  const { username, clearAuth } = useAuthStore()
+  const { username, role, clearAuth } = useAuthStore()
 
   const offlineCount = services.filter(s => s.status === 'offline').length
   const unreadAlerts = alerts.filter(a => !a.resolvedAt).length
@@ -27,6 +36,11 @@ export function Sidebar() {
     alerts: unreadAlerts > 0 ? String(unreadAlerts) : undefined,
     overview: offlineCount > 0 ? `${offlineCount} ↓` : undefined,
   } as any
+
+  const visibleNav = NAV.filter(item => {
+    if (!item.requireRole || !role) return true
+    return item.requireRole.includes(role)
+  })
 
   return (
     <nav className="hidden lg:flex flex-col w-48 bg-surface-1 border-r border-surface-border flex-shrink-0">
@@ -40,11 +54,11 @@ export function Sidebar() {
 
       {/* Nav items */}
       <div className="flex-1 py-3 overflow-y-auto">
-        {NAV.map((item, i) => {
+        {visibleNav.map((item, i) => {
           const Icon = item.icon
           const isActive = currentPage === item.id
           const badge = badges[item.id]
-          const showSection = item.section && (i === 0 || NAV[i - 1].section !== item.section)
+          const showSection = item.section && (i === 0 || visibleNav[i - 1].section !== item.section)
 
           return (
             <div key={item.id}>
@@ -80,7 +94,7 @@ export function Sidebar() {
       <div className="border-t border-surface-border px-4 py-2.5 flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <div className="text-[10px] text-slate-400 font-mono truncate">{username}</div>
-          <div className="text-[9px] text-slate-600">admin</div>
+          <div className="text-[9px] text-slate-600">{role ? ROLE_LABELS[role] : 'admin'}</div>
         </div>
         <button
           onClick={() => { clearAuth(); window.location.reload() }}

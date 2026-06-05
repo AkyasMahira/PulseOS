@@ -17,22 +17,23 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Collectors** | `collectors/*.ts` | Reads raw Linux metrics from `/proc`, Docker socket, `df`, `systemctl`, `pm2` |
 | **Collector Orchestrator** | `collectors/index.ts` | `collectAll()` — runs all collectors in parallel with `Promise.allSettled` |
 | **WebSocket Hub** | `ws/hub.ts` | Runs collection loop every 5s, broadcasts to Socket.IO clients, persists to SQLite |
-| **Alert Engine** | `alerts.ts` | Evaluates threshold rules after each collection tick, fires notifications, enforces cooldowns |
+| **Alert Engine** | `alerts.ts` | Evaluates threshold rules after each collection tick, fires notifications via Telegram/Discord/Webhooks, enforces cooldowns |
 | **Database** | `db/index.ts` | SQLite singleton, schema migration, all query functions |
-| **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint |
-| **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query |
-| **Docker Routes** | `routes/docker.ts` | Container list, start/stop/restart/remove, log streaming |
-| **Team Routes** | `routes/team.ts` | CRUD for users, invite generation, role assignment |
-| **Servers Routes** | `routes/servers.ts` | Remote server registry + in-memory polling cache |
-| **Billing Routes** | `routes/billing.ts` | Plan definitions, Stripe checkout/portal, webhook handler |
-| **API Keys Routes** | `routes/apikeys.ts` | API key CRUD + webhook CRUD |
+| **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint. JWT contains `{ sub, username, role }`. `last_login_at` updated on login. |
+| **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query. Alert rule CRUD gated behind `requireAdmin`. |
+| **Docker Routes** | `routes/docker.ts` | Container list, log streaming (viewer+). Start/stop/restart/remove gated behind `requireAdmin`. |
 | **Status Route** | `routes/status.ts` | Public unauthenticated status page data |
+| **Team Routes** | `routes/team.ts` | User CRUD (owner-gated), invite generation/revocation (admin-gated), accept-invite (no auth) |
+| **Server Routes** | `routes/servers.ts` | Remote server CRUD (admin-gated), `apiToken` stripped from all responses, polling loop via `startRemotePolling()` |
+| **API Key Routes** | `routes/apikeys.ts` | API key CRUD (one-time reveal), webhook CRUD. All admin-gated. |
+
+> 📋 **Planned (Phase 4)**: `routes/billing.ts`
 
 ### Frontend (`apps/web`)
 
 | Module | Files | Purpose |
 |---|---|---|
-| **State** | `stores/metrics.ts` | Zustand store — live metrics, page navigation, auth token, remote servers, billing, team |
+| **State** | `stores/metrics.ts` | Zustand store — live metrics, page navigation, auth token |
 | **Socket Hook** | `hooks/useSocket.ts` | Connects to Socket.IO, feeds all events into store |
 | **Router** | `components/dashboard/Dashboard.tsx` | Page-level router using `currentPage` from store |
 | **Overview** | `Dashboard.tsx > OverviewPage` | Main dashboard with MetricCards + SparkLines + ServicesTable + ProcessTable |
@@ -41,11 +42,12 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Network** | `dashboard/NetworkPage.tsx` | Per-interface bandwidth breakdown |
 | **History** | `history/HistoryPage.tsx` | Time-series charts with range selector (1h/6h/24h/7d) |
 | **Alerts** | `alerts/AlertsPage.tsx` | Alert events feed + rule management |
-| **Servers** | `servers/ServersPage.tsx` | Multi-server overview cards + add form |
-| **Team** | `servers/TeamPage.tsx` | User list, invite form, role assignment |
-| **Billing** | `saas/BillingPage.tsx` | Plan grid, usage meters, Stripe checkout redirect |
-| **API Keys** | `saas/ApiKeysPage.tsx` | Key creation with one-time reveal, revocation |
-| **Settings** | `alerts/SettingsPage.tsx` | Server info, notification config, API reference |
+| **Settings** | `alerts/SettingsPage.tsx` | Server info, notification config |
+| **Servers** | `servers/ServersPage.tsx` | Remote server cards with CPU/RAM/Disk, add/remove, online status |
+| **Team** | `servers/TeamPage.tsx` | User list with role management, invite creation + link sharing |
+| **API Keys** | `saas/ApiKeysPage.tsx` | Key creation (one-time reveal), webhook management |
+
+> 📋 **Planned (Phase 4)**: `saas/BillingPage.tsx`
 
 ### Shared Types (`packages/types`)
 
@@ -53,7 +55,9 @@ Single file `src/index.ts` exports all interfaces shared between frontend and ba
 
 ---
 
-## User Roles
+## User Roles (✅ Phase 3 — fully implemented)
+
+> RBAC is fully implemented: types, DB schema, JWT role claims, middleware, route-level enforcement, and UI role filtering.
 
 | Role | Permissions |
 |---|---|
@@ -61,7 +65,7 @@ Single file `src/index.ts` exports all interfaces shared between frontend and ba
 | `admin` | All monitoring features, container actions, invite users, manage alerts. Cannot access billing or delete owner |
 | `viewer` | Read-only — can view all dashboards, cannot perform actions or manage team |
 
-Role is embedded in the JWT payload. Frontend enforces UI-level restrictions. Backend enforces server-side via `requireAdmin`/`requireOwner` middleware.
+Key implementation requirements: `role` column on `users` table, `role` claim in JWT payload, role-check middleware, role-filtered sidebar navigation.
 
 ---
 
@@ -70,8 +74,8 @@ Role is embedded in the JWT payload. Frontend enforces UI-level restrictions. Ba
 ### First-Run Setup
 1. `userCount() === 0` → `/api/auth/setup` is open
 2. POST with `username + password + email` → creates `owner` account
-3. JWT returned → stored in `localStorage` via `useAuthStore`
-4. Alternatively: set `ADMIN_USER` + `ADMIN_PASS` env vars → auto-created on boot
+3. JWT (with `{ sub, username, role: 'owner' }`) returned → stored in `localStorage` via `useAuthStore`
+4. Alternatively: set `ADMIN_USER` + `ADMIN_PASS` env vars → auto-created as `owner` on boot
 
 ### Metrics Collection Loop
 1. `createSocketServer()` calls `startCollection()` on boot
@@ -81,19 +85,19 @@ Role is embedded in the JWT payload. Frontend enforces UI-level restrictions. Ba
 5. If threshold crossed and cooldown elapsed → `fireAlert()` → DB insert + Socket.IO broadcast + Telegram/Discord
 6. All 4 metric payloads broadcast via `io.emit()` to all authenticated WS clients
 
-### Remote Server Polling
+### Remote Server Polling (✅ Phase 3C)
 1. `startRemotePolling()` called on boot — polls all servers in `servers` table
 2. Each remote server polled via `fetch(apiUrl/api/metrics/now)` with stored API token
 3. Results cached in `remoteCache` Map (in-memory, resets on restart)
 4. Frontend fetches `/api/servers` REST endpoint (not WS) to display server cards
 
-### Team Invite Flow
+### Team Invite Flow (✅ Phase 3B)
 1. Admin/owner POSTs to `/api/team/invite` with `{ email, role }`
 2. Token stored in `invites` table (48h expiry)
 3. Invite URL returned in API response (email sending NOT implemented — URL shown in UI)
 4. Invitee visits `/accept-invite?token=xxx` → sets username/password → account created → redirected to dashboard
 
-### Billing / Upgrade Flow
+### Billing / Upgrade Flow (📋 Planned — Phase 4)
 1. User navigates to Billing page → plans fetched from `/api/billing/plans` (static data from `PLANS` constant)
 2. Click upgrade → POST `/api/billing/checkout` → Stripe Checkout session created → redirect
 3. Stripe webhook hits `/api/billing/webhook` → `updateSubscription()` updates SQLite
@@ -113,12 +117,11 @@ db/index.ts (SQLite)
 alerts.ts → checks rules from DB → fires to Telegram/Discord + Socket.IO
 
 routes/* → all read from db/index.ts
-routes/servers.ts → maintains in-memory remoteCache, polls remote PulseOS instances
 
 Frontend:
 useSocket.ts → feeds → useMetricsStore (Zustand)
 Dashboard.tsx → reads store → renders current page component
-All page components → fetch REST APIs for non-live data (history, team, billing)
+All page components → fetch REST APIs for non-live data (history)
 ```
 
 ---
@@ -140,9 +143,11 @@ All page components → fetch REST APIs for non-live data (history, team, billin
 | `TELEGRAM_BOT_TOKEN` | — | Telegram alerts |
 | `TELEGRAM_CHAT_ID` | — | Telegram alerts |
 | `DISCORD_WEBHOOK_URL` | — | Discord alerts |
-| `WEB_ORIGIN` | `http://localhost:4321` | CORS + invite URLs |
-| `STRIPE_SECRET_KEY` | — | Billing (Phase 4) |
-| `STRIPE_WEBHOOK_SECRET` | — | Billing webhook |
-| `STRIPE_PRICE_*` | — | Plan price IDs |
+| `WEB_ORIGIN` | `http://localhost:4321` | CORS |
 | `STATUS_PAGE_TITLE` | `System Status` | Public status page |
+| `STATUS_PAGE_DESC` | `Real-time service status` | Public status page description |
 | `DB_PATH` | `apps/api/data/pulseos.db` | SQLite location |
+
+> 📋 **Planned (Phase 4)**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`
+
+> **Env file locations**: Root `.env` = backend (`dotenv/config`). `apps/web/.env` = frontend (`PUBLIC_API_URL` via Astro/Vite `define`). They do NOT share variables.

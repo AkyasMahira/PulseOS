@@ -23,7 +23,7 @@ export function LoginPage() {
       })
       const data = await res.json()
       if (!data.ok) throw new Error(data.error)
-      setAuth(data.data.token, data.data.username)
+      setAuth(data.data.token, data.data.username, data.data.role)
       window.location.reload()
     } catch (e: any) {
       setError(e.message ?? 'Login failed')

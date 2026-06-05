@@ -1,0 +1,229 @@
+---
+import '../styles/global.css'
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PulseOS — Accept Invite</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      window.API_URL = (import.meta.env.PUBLIC_API_URL ?? 'http://localhost:3001')
+    </script>
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        background: #0a0a0f;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        color: #cbd5e1;
+      }
+      .card {
+        background: #111118;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+        padding: 32px;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      }
+      .card h1 {
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: #6366f1;
+        margin: 0 0 24px 0;
+      }
+      .field {
+        margin-bottom: 16px;
+      }
+      .field label {
+        display: block;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #64748b;
+        margin-bottom: 4px;
+      }
+      .field input {
+        width: 100%;
+        background: #1a1a24;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: #e2e8f0;
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+        box-sizing: border-box;
+      }
+      .field input:focus {
+        border-color: #6366f1;
+      }
+      button {
+        width: 100%;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 13px;
+        font-family: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      button:hover {
+        background: #818cf8;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .error {
+        background: #3b0d0d;
+        border: 1px solid #7f1d1d;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 16px;
+        font-size: 11px;
+        color: #fca5a5;
+      }
+      .success {
+        background: #0d3b1e;
+        border: 1px solid #1d7f3b;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        font-size: 12px;
+        color: #86efac;
+      }
+      .info {
+        background: #0d1e3b;
+        border: 1px solid #1d4d7f;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+        font-size: 11px;
+        color: #93c5fd;
+      }
+      .loading {
+        text-align: center;
+        color: #64748b;
+        font-size: 12px;
+        padding: 40px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="app"></div>
+
+    <script type="module">
+      const API_URL = window.API_URL
+      const params = new URLSearchParams(window.location.search)
+      const token = params.get('token')
+
+      const root = document.getElementById('app')
+
+      function render(state) {
+        const { step, invite, error, message } = state
+
+        if (step === 'loading') {
+          root.innerHTML = '<div class="loading">Validating invite...</div>'
+          return
+        }
+
+        if (step === 'invalid') {
+          root.innerHTML = `<div class="error">${error || 'Invalid or expired invite link.'}</div>`
+          return
+        }
+
+        if (step === 'success') {
+          root.innerHTML = `<div class="success">${message}<br/><br/><a href="/" style="color:#818cf8;font-size:12px;">Go to Dashboard</a></div>`
+          return
+        }
+
+        if (step === 'form') {
+          root.innerHTML = `
+            <h1>Accept Invitation</h1>
+            <div class="info">You've been invited as <strong>${invite.role}</strong> (${invite.email})</div>
+            <div class="field">
+              <label>Username</label>
+              <input type="text" id="username" placeholder="Choose a username" autocomplete="username" />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input type="password" id="password" placeholder="Min 8 characters" autocomplete="new-password" />
+            </div>
+            ${error ? `<div class="error">${error}</div>` : ''}
+            <button id="submit-btn">Create Account</button>
+          `
+          document.getElementById('submit-btn').addEventListener('click', handleSubmit)
+        }
+      }
+
+      function showError(msg) {
+        render({ step: 'form', invite: state.invite, error: msg })
+      }
+
+      let state = { step: 'loading', invite: null, error: null, message: null }
+
+      render(state)
+
+      if (!token) {
+        state = { step: 'invalid', error: 'No invite token provided.', invite: null, message: null }
+        render(state)
+      } else {
+        try {
+          const res = await fetch(`${API_URL}/api/team/invite-info?token=${encodeURIComponent(token)}`)
+          const data = await res.json()
+          if (!data.ok || !data.data) {
+            state = { step: 'invalid', error: data.error || 'Invite not found or expired.', invite: null, message: null }
+          } else {
+            state = { step: 'form', invite: data.data, error: null, message: null }
+          }
+          render(state)
+        } catch {
+          state = { step: 'invalid', error: 'Failed to validate invite. Is the server running?', invite: null, message: null }
+          render(state)
+        }
+      }
+
+      async function handleSubmit() {
+        const username = document.getElementById('username')?.value?.trim()
+        const password = document.getElementById('password')?.value
+
+        if (!username) return showError('Username is required.')
+        if (!password || password.length < 8) return showError('Password must be at least 8 characters.')
+
+        document.getElementById('submit-btn').disabled = true
+
+        try {
+          const res = await fetch(`${API_URL}/api/team/accept-invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, username, password }),
+          })
+          const data = await res.json()
+          if (!data.ok) {
+            showError(data.error || 'Failed to create account.')
+          } else {
+            render({ step: 'success', invite: null, error: null, message: 'Account created! You can now log in.' })
+          }
+        } catch {
+          showError('Network error. Please try again.')
+        }
+
+        document.getElementById('submit-btn').disabled = false
+      }
+    </script>
+  </body>
+</html>

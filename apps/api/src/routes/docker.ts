@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { collectDocker } from '../collectors/docker.js'
 import { request as httpRequest } from 'http'
 
@@ -42,7 +42,7 @@ export async function dockerRoutes(app: FastifyInstance) {
   // POST /api/docker/:id/:action
   app.post<{ Params: { id: string; action: string } }>(
     '/:id/:action',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const { id, action } = req.params
       const allowed = ['start', 'stop', 'restart', 'pause', 'unpause']
@@ -66,7 +66,7 @@ export async function dockerRoutes(app: FastifyInstance) {
   // DELETE /api/docker/:id
   app.delete<{ Params: { id: string }; Querystring: { force?: string } }>(
     '/:id',
-    { preHandler: requireAuth },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const { id } = req.params
       const force = req.query.force === 'true'

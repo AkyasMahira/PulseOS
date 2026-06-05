@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
-import { getUserByUsername, insertUser, userCount } from '../db/index.js'
+import { getUserByUsername, insertUser, userCount, updateLastLogin } from '../db/index.js'
 
 export async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/login
@@ -23,8 +23,9 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ ok: false, error: 'Invalid credentials' })
     }
 
-    const token = app.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: '7d' })
-    return { ok: true, data: { token, username: user.username } }
+    const token = app.jwt.sign({ sub: user.id, username: user.username, role: user.role }, { expiresIn: '7d' })
+    updateLastLogin(user.id)
+    return { ok: true, data: { token, username: user.username, role: user.role } }
   })
 
   // POST /api/auth/setup  (first-run only)
@@ -39,9 +40,9 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const hashed = await bcrypt.hash(password, 12)
-    insertUser(username, hashed)
-    const token = app.jwt.sign({ sub: 1, username }, { expiresIn: '7d' })
-    return { ok: true, data: { token, username } }
+    insertUser(username, hashed, 'owner')
+    const token = app.jwt.sign({ sub: 1, username, role: 'owner' }, { expiresIn: '7d' })
+    return { ok: true, data: { token, username, role: 'owner' } }
   })
 
   // GET /api/auth/me

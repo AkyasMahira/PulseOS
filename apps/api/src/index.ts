@@ -8,6 +8,9 @@ import { authRoutes } from './routes/auth.js'
 import { metricsRoutes, alertRoutes } from './routes/metrics.js'
 import { dockerRoutes } from './routes/docker.js'
 import { statusRoutes } from './routes/status.js'
+import { teamRoutes } from './routes/team.js'
+import { serversRoutes, startRemotePolling } from './routes/servers.js'
+import { apiKeysRoutes } from './routes/apikeys.js'
 import { createSocketServer } from './ws/hub.js'
 import { getDb, insertUser, userCount } from './db/index.js'
 import bcrypt from 'bcryptjs'
@@ -15,6 +18,10 @@ import bcrypt from 'bcryptjs'
 const PORT = parseInt(process.env.PORT ?? '3001')
 const HOST = process.env.HOST ?? '0.0.0.0'
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me'
+
+if (JWT_SECRET === 'dev-secret-change-me') {
+  console.warn('[pulseos] WARNING: Using default JWT secret. Set JWT_SECRET env var for production.')
+}
 
 async function bootstrap() {
   // Init DB
@@ -25,11 +32,11 @@ async function bootstrap() {
   const adminPass = process.env.ADMIN_PASS
   if (adminUser && adminPass && userCount() === 0) {
     const hashed = await bcrypt.hash(adminPass, 12)
-    insertUser(adminUser, hashed)
-    console.log(`[init] Created admin user: ${adminUser}`)
+    insertUser(adminUser, hashed, 'owner')
+    console.log(`[init] Created owner account: ${adminUser}`)
   }
 
-  const app = Fastify({ logger: { level: 'warn' }, trustProxy: true })
+  const app = Fastify({ logger: { level: 'warn' }, trustProxy: true, bodyLimit: 1_048_576 })
 
   // Plugins
   await app.register(FastifyCors, {
@@ -51,6 +58,9 @@ async function bootstrap() {
   await app.register(alertRoutes, { prefix: '/api/alerts' })
   await app.register(dockerRoutes, { prefix: '/api/docker' })
   await app.register(statusRoutes, { prefix: '/status' })
+  await app.register(teamRoutes, { prefix: '/api/team' })
+  await app.register(serversRoutes, { prefix: '/api/servers' })
+  await app.register(apiKeysRoutes, { prefix: '/api/apikeys' })
 
   // Health check
   app.get('/health', async () => ({ ok: true, ts: Date.now() }))
@@ -59,6 +69,8 @@ async function bootstrap() {
   const httpServer = createServer(app.server)
   // Socket.IO attaches to existing server
   createSocketServer(app.server as any, JWT_SECRET)
+
+  startRemotePolling(parseInt(process.env.COLLECT_INTERVAL_MS ?? '5000'))
 
   await app.listen({ port: PORT, host: HOST })
   console.log(`[pulseos] API running on http://${HOST}:${PORT}`)

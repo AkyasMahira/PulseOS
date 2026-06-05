@@ -29,45 +29,52 @@
 
 ---
 
-## 2. Role-Based Access Control
+## 2. Role-Based Access Control (✅ Phase 3 — fully implemented)
 
 ### BR-RBAC-01 — Role Hierarchy
-- **Status**: Implemented
+- **Status**: ✅ Implemented
 - Three roles: `owner` > `admin` > `viewer`.
-- `viewer`: Read-only. Can view all dashboards. Cannot perform actions (container restart, alerts, team management).
-- `admin`: Can perform all monitoring actions. Can invite users (viewer or admin role only). Cannot access billing. Cannot delete owner.
-- `owner`: Full access including billing, team management, deleting users, assigning any role.
+- Roles stored in `users.role` column (TEXT, default `'admin'`).
+- Role embedded in JWT `{ sub, username, role }` claim.
+- Middleware: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only).
+- Route enforcement (Phase 3E): container mutations and alert rule creation require `requireAdmin`.
+- Frontend sidebar filters nav items by `requireRole` array — `servers`, `team`, `apikeys` hidden from viewers.
+- `viewer`: Read-only. Can view all dashboards and container logs. Cannot restart/remove containers, create alert rules, manage team, or access servers/apikeys/team API endpoints.
+- `admin`: Can perform all monitoring actions, container mutations, invite users (viewer or admin only), manage alerts. Cannot access billing or delete owner.
+- `owner`: Full access including team management, deleting users, assigning any role.
 
 ### BR-RBAC-02 — Role Assignment Constraints
-- **Status**: Implemented
-- Only `owner` can change user roles.
-- Only `owner` can delete users.
-- `owner` cannot delete themselves.
-- `admin` can only invite users with role `viewer` or `admin` (not `owner`).
+- **Status**: ✅ Implemented
+- `PUT /api/team/users/:id/role` gated behind `requireOwner`. Only owner can change user roles.
+- `DELETE /api/team/users/:id` gated behind `requireOwner`. Only owner can delete users.
+- Owner cannot delete themselves (enforced server-side).
+- Owner cannot change their own role (enforced server-side).
+- `POST /api/team/invites` only allows invite roles `viewer` or `admin` (not `owner`). Enforced server-side.
 - There is no restriction on multiple owners (any owner can promote another user to owner).
 
 ### BR-RBAC-03 — Billing Page Visibility
-- **Status**: Implemented (UI-only; not server-enforced)
+- **Status**: 📋 Planned
 - Billing page only shown in sidebar for `owner` role.
-- Backend billing endpoints do not check role — any authenticated user can technically reach them via direct API call.
+- Backend billing endpoints checked via role middleware.
 
 ---
 
-## 3. Team Invite Rules
+## 3. Team Invite Rules (✅ Phase 3B — fully implemented)
 
 ### BR-TEAM-01 — Invite Lifecycle
-- **Status**: Partial (token works; email not sent)
+- **Status**: ✅ Implemented
+- `routes/team.ts` provides full CRUD for invites. `POST /api/team/invites` creates invite (admin-gated). `DELETE /api/team/invites/:id` revokes (admin-gated).
+- `accept-invite.astro` page validates token via `GET /api/team/invite-info`.
+- `POST /api/team/accept-invite` creates user account and deletes invite.
 - Invite token is valid for **48 hours** from creation.
 - Tokens are UUID-based (32 hex characters after dashes stripped).
 - Expired invites are automatically excluded from `listInvites()` query.
-- Accepting an invite deletes the invite record from the table.
-- Each invite is for a specific email address; the accept-invite page does not verify that the user provides the same email.
+- Each invite is for a specific email address.
 
 ### BR-TEAM-02 — Invite Delivery
-- **Status**: Not Implemented
-- The API returns the invite URL in the response body.
-- Email sending is acknowledged as missing with a comment: "In production send email; for now return URL."
-- Frontend displays the URL in the UI for manual sharing.
+- **Status**: 🚧 Partially Implemented
+- The API returns the invite URL in the response body (`inviteUrl` field).
+- Email sending requires nodemailer/SMTP integration.
 
 ---
 
@@ -87,11 +94,12 @@
 - On API restart, all cooldowns reset to zero.
 
 ### BR-ALERT-03 — Alert Channels
-- **Status**: Partial
+- **Status**: ✅ Implemented (enhanced in Phase 3D)
 - `telegram`: Implemented via direct `fetch()` to Bot API.
 - `discord`: Implemented via webhook URL.
+- `webhook`: Implemented via `fireAlert()` calling `listWebhooks()`. Dispatches to all enabled webhooks subscribed to `alert:fired` event. Includes `X-Webhook-Secret` header.
 - `email`: Defined in `AlertChannel` type but not implemented in dispatch logic.
-- Channels are stored as a JSON array per rule.
+- Channels are stored as a JSON array per rule. Webhooks use the separate `webhooks` table.
 
 ### BR-ALERT-04 — Alert Resolution
 - **Status**: Not Implemented
@@ -123,77 +131,70 @@
 - Logs include both stdout and stderr (`stdout=1&stderr=1`).
 - Raw Docker multiplexed stream is returned — 8-byte frame headers are not stripped (known issue L-08).
 
+### BR-DOCKER-03 — RBAC on Container Actions
+- **Status**: ✅ Implemented (Phase 3E)
+- `POST /:id/:action` (start, stop, restart, pause, unpause): requires `requireAdmin` (owner or admin).
+- `DELETE /:id` (remove container): requires `requireAdmin`.
+- `GET /` (list containers) and `GET /:id/logs`: requires `requireAuth` (any authenticated user, including viewers).
+- Viewers can monitor containers but cannot perform destructive actions.
+
 ---
 
-## 6. Multi-Server Rules
+## 6. Multi-Server Rules (✅ Phase 3C — fully implemented)
 
 ### BR-SERVER-01 — Local Server
-- **Status**: Implemented
+- **Status**: ✅ Implemented
 - The local server is always present and is the primary monitored instance.
 - It is represented with `id: 'local'` in the frontend but is not stored in the `servers` table.
 
 ### BR-SERVER-02 — Remote Servers
-- **Status**: Implemented (in-memory cache)
-- Remote servers are polled via HTTP GET to `{apiUrl}/api/metrics/now`.
-- Authentication uses the stored `api_token` as a Bearer token.
-- Poll interval matches `COLLECT_INTERVAL_MS` (default 10s for remotes).
-- Remote server status is lost on API restart.
-- Remote metrics are **not** stored in `metrics_history` — no historical data for remote servers.
+- **Status**: ✅ Implemented
+- `routes/servers.ts` provides full CRUD for remote servers (admin-gated).
+- `startRemotePolling()` polls all servers via HTTP GET to `{apiUrl}/api/metrics/now` every `COLLECT_INTERVAL_MS`.
+- Authentication uses the stored `apiToken` as a Bearer token.
+- Results cached in `remoteCache` Map (in-memory, resets on restart).
 
 ### BR-SERVER-03 — API Token Security
-- **Status**: Partial (security issue H-06)
-- `apiToken` is stored in the `servers` table.
-- It is currently returned in API responses — should be masked.
+- **Status**: ✅ Implemented
+- `routes/servers.ts:10` — `stripToken()` function removes `apiToken` from all GET responses.
+- The `ServerConfig` type has `apiToken: string` (required), but the route returns `Omit<ServerConfig, 'apiToken'>` to clients.
+- Token is never exposed in frontend bundle or API responses.
 
 ---
 
-## 7. Billing / Plan Rules
+## 7. Billing / Plan Rules (📋 Planned — Phase 4)
 
 ### BR-BILLING-01 — Plan Definitions
-- **Status**: Implemented (definitions only; limits not enforced)
-
-| Plan | Servers | Users | Retention | Alert Rules | Price |
-|---|---|---|---|---|---|
-| Free | 1 | 1 | 7 days | 3 | $0 |
-| Pro | 5 | 3 | 30 days | 20 | $9/mo |
-| Team | 20 | 10 | 90 days | ∞ | $29/mo |
-| Enterprise | ∞ | ∞ | 365 days | ∞ | Custom |
+- **Status**: Planned
 
 ### BR-BILLING-02 — Limit Enforcement
-- **Status**: Not Implemented
-- Plan limits are defined in the `PLANS` constant.
-- No API endpoint checks limits before allowing resource creation.
-- A Free plan user can add unlimited servers, users, and alert rules.
+- **Status**: Planned
 
 ### BR-BILLING-03 — Stripe Integration
-- **Status**: Partial
-- Checkout session creation: Implemented (requires `STRIPE_SECRET_KEY`).
-- Customer portal: Implemented (requires active Stripe subscription).
-- Webhook: Parses `customer.subscription.*` events but does not verify HMAC signature.
-- Default plan on fresh install: `free` (seeded via `INSERT OR IGNORE` in migration).
+- **Status**: Planned
 
 ### BR-BILLING-04 — Yearly Discount
-- **Status**: Implemented (pricing only)
-- Yearly pricing is approximately 20% less than monthly (12 × monthly vs `priceYearly`).
-- Pro: $9/mo monthly vs $7.20/mo yearly ($86.4/yr).
-- Team: $29/mo monthly vs $23.20/mo yearly ($278.4/yr).
+- **Status**: Planned (pricing only)
 
 ---
 
-## 8. API Key Rules
+## 8. API Key Rules (✅ Phase 3D — fully implemented)
 
 ### BR-APIKEY-01 — Key Lifecycle
-- **Status**: Partial (CRUD works; auth not wired)
-- Keys are created with a `pk_` prefix followed by 32 hex characters.
-- The full key is returned **once** at creation time and never again.
-- `key_prefix` (first 10 chars) stored for display purposes.
-- Keys can be scoped: `read`, `write`, `admin`.
-- Keys belong to the creating user.
+- **Status**: ✅ Implemented
+- `routes/apikeys.ts` provides full CRUD for API keys (admin-gated).
+- Keys generated as `{prefix}{32-hex-uuid}`. Default prefix: `pk_`.
+- Full key returned once at creation — stored in API response `fullKey` field.
+- `prefix` (e.g., `pk_`) displayed in key list for identification.
+- Keys scoped: `read`, `write`, `admin`.
+- Keys belong to the creating user (`created_by` column).
+- Key can be revoked via `DELETE /api/apikeys/:id`.
 
 ### BR-APIKEY-02 — Key Authentication
-- **Status**: Not Implemented
-- `getApiKeyByRaw()` and `touchApiKey()` functions exist in `db/index.ts`.
-- No middleware reads the `x-api-key` header or authorizes requests using API keys.
+- **Status**: ✅ Implemented
+- `requireApiKey` middleware in `middleware/auth.ts` checks `x-api-key` header.
+- Calls `getApiKeyByHash()` to validate key, `touchApiKey()` to update `last_used_at`.
+- ⚠️ Keys stored as plaintext in `key_hash` column — no cryptographic hashing.
 
 ---
 
