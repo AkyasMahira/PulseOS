@@ -16,22 +16,23 @@
 - **Fix Required**: When implementing, use `stripe` npm package with `webhooks.constructEvent()` and register `@fastify/rawbody` plugin.
 
 ### C-02 — API Keys Stored as Plaintext
-- **Status**: Planned — API key feature does not exist yet
-- **Risk**: Not yet applicable — no api_keys table or routes/apikeys.ts exists (planned Phase 3).
-- **Fix Required**: When implementing, store `sha256(key)` in `key_hash` column.
+- **Status**: Planned — API key infrastructure exists (table + CRUD functions), but no route handlers exist. `createApiKey()` stores `key_hash` directly without hashing.
+- **Risk**: When API key routes are implemented (Phase 3D), keys will be stored in plaintext unless `createApiKey()` is updated to hash before storage.
+- **File**: `apps/api/src/db/index.ts:314-322`
+- **Fix Required**: When implementing routes, pass `sha256(key)` to `createApiKey()` `keyHash` parameter.
 
 ### C-03 — API Keys Not Used for Authentication
-- **Status**: Planned — API key feature does not exist yet
-- **Risk**: Not yet applicable — planned for Phase 3.
-- **Fix Required**: When implementing, add `x-api-key` header check to `requireAuth` middleware.
+- **Status**: Planned — API key infrastructure exists (table + CRUD functions), but no auth middleware checks `x-api-key` header.
+- **Risk**: Not yet applicable — no API key endpoints exposed (planned for Phase 3D).
+- **Fix Required**: When implementing, add `x-api-key` header check to auth middleware.
 
 ---
 
 ### C-04 — Default JWT Secret in Production
-- **Status**: Pending (depends on deployment)
+- **Status**: Partially Fixed (warning added, no hard enforcement)
 - **Risk**: If `JWT_SECRET` env var is not set, the application starts with `'dev-secret-change-me'` as the JWT signing key. Any attacker who knows this can forge valid JWTs for any user including owners.
-- **File**: `apps/api/src/index.ts:21`
-- **Fix Required**: At minimum, log a `[WARN]` on startup if secret is default. Ideally, `process.exit(1)` in production if not set.
+- **File**: `apps/api/src/index.ts`
+- **Fix Applied**: Phase 3A added console.warn on startup if JWT_SECRET is default. Recommended: `process.exit(1)` in production if not set.
 
 ---
 
@@ -58,11 +59,9 @@
 - **Fix Required**: In each route, call `getSubscription()` → look up `PLANS[planId].limits` → reject if limit exceeded.
 
 ### H-04 — `requireAuth` Does Not Return After `reply.send()`
-- **Status**: Pending
-- **Risk**: In Fastify, after `reply.send()` the handler can continue executing. If route handler accesses `req.user` after a 401, it will throw.
-- **File**: `apps/api/src/middleware/auth.ts:6`
-- **Evidence**: `reply.code(401).send(...)` — no `return` statement.
-- **Fix Required**: Add `return` before or after `reply.send()`, or re-throw the error.
+- **Status**: ✅ Fixed
+- **File**: `apps/api/src/middleware/auth.ts:14-16`
+- **Evidence**: `requireAuth`, `requireAdmin`, and `requireOwner` all have `return` after each `reply.send()` call. Async flow no longer continues after error responses.
 
 ### H-05 — Disk History Table Never Written
 - **Status**: Pending
@@ -71,10 +70,10 @@
 - **Fix Required**: Add `insertDiskHistory()` function in `db/index.ts` and call it in `ws/hub.ts:tick()` for each disk in `snapshot.disks`.
 
 ### H-06 — Remote Server API Tokens (Security Issue)
-- **Status**: Planned — feature does not exist yet
-- **Risk**: Not yet applicable — no servers table or routes exist (planned Phase 3).
-- **Files**: N/A (routes/servers.ts does not exist)
-- **Fix Required**: When implementing, strip `apiToken` from all responses. Never return it after creation.
+- **Status**: ⚠️ Needs Verification — DB infrastructure exists, routes not yet implemented
+- **Risk**: `listServers()` in `db/index.ts:292` returns `apiToken` directly. When server routes are implemented (Phase 3C), this function must NOT be called directly from a GET endpoint.
+- **Files**: `db/index.ts:282-310`, `packages/types/src/index.ts` (ServerConfig.apiToken is required, not optional)
+- **Fix Required**: When implementing routes, create a response DTO that omits `apiToken`. Never call `listServers()` from an API response handler without stripping the token.
 
 ---
 
@@ -89,10 +88,9 @@
 - **Fix Required**: Add Fastify JSON schema validation to all POST routes (like the login route already has).
 
 ### M-02 — Sidebar Role Label Is Hardcoded
-- **Status**: Pending (Planned fix with RBAC)
-- **File**: `components/layout/Sidebar.tsx:83`
-- **Evidence**: Role label hardcoded as `admin` — no JWT decode or actual role resolution.
-- **Risk**: Minor — backend currently has no role system. With RBAC implementation, this must read role from token/store.
+- **Status**: ✅ Fixed
+- **File**: `components/layout/Sidebar.tsx`
+- **Evidence**: Role badge now reads `{role ? ROLE_LABELS[role] : 'admin'}` from `useAuthStore().role`. Role sourced from JWT payload via `decodeRoleFromToken()` on refresh. Nav items filtered by `requireRole` arrays.
 
 ### M-03 — No CSRF Protection
 - **Status**: Pending
@@ -111,9 +109,9 @@
 - **Fix Required**: Persist `lastFired` timestamps to SQLite (add `last_fired_at` column to `alert_rules`).
 
 ### M-06 — No Request Body Size Limit
-- **Status**: Pending
-- **Risk**: Large payloads to any POST endpoint could cause memory pressure on a 2GB VPS.
-- **Fix Required**: Add `bodyLimit` to Fastify config in `index.ts` (e.g., `bodyLimit: 1048576` for 1MB).
+- **Status**: ✅ Fixed
+- **File**: `apps/api/src/index.ts`
+- **Evidence**: Fastify configured with `bodyLimit: 1_048_576` (1MB).
 
 ### M-07 — `@fastify/websocket` Listed But Unused
 - **Status**: Pending
@@ -133,9 +131,9 @@
 ---
 
 ### L-01 — `getUserById` Function Defined But Never Called
-- **Status**: Pending
-- **File**: `apps/api/src/db/index.ts:224`
-- **Fix**: Either use it in team routes (e.g., to fetch user after accept-invite) or remove.
+- **Status**: Pending (will be used in Phase 3B team routes)
+- **File**: `apps/api/src/db/index.ts:209`
+- **Fix**: Use in team routes (e.g., to fetch user after accept-invite). Currently only called through planned `routes/team.ts`.
 
 ### L-02 — `HistoryQuery` Interface Defined But Never Used
 - **Status**: Pending

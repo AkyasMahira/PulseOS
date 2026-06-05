@@ -10,19 +10,21 @@
 |---|---|---|---|---|
 | IP-01 | Alert auto-resolution | S | `alerts.ts`, `db/index.ts` | Track active rule IDs in memory; UPDATE resolved_at when rule stops firing |
 | IP-02 | Disk history writes | S | `ws/hub.ts`, `db/index.ts` | Add `insertDiskHistory()` + call in `tick()` for each disk |
+| IP-03 | RBAC route enforcement | M | `routes/*` | `requireAdmin`/`requireOwner` middleware exists but not applied to existing routes. Apply to container actions, alert CRUD, settings |
+| IP-04 | ALTER TABLE idempotency | S | `db/index.ts` | Bare `ALTER TABLE ADD COLUMN` in `migrate()` will fail on second startup. Add `PRAGMA table_info` guard or try/catch. |
 
 ---
 
-## 📋 Phase 3 — Multi-Server + Team (Not Started)
+## 📋 Phase 3 — Multi-Server + Team
 
 | # | Task | Complexity | Files | Notes |
 |---|---|---|---|---|
-| P3-01 | RBAC implementation | M | `db/index.ts`, `routes/auth.ts`, `middleware/auth.ts`, `Sidebar.tsx` | Add `role`, `email`, `last_login_at` to users table; add `role` to JWT payload; create `requireAdmin`/`requireOwner` middleware; role-filtered sidebar |
-| P3-02 | Team management routes | M | `routes/team.ts` | User CRUD, invite generation (48h expiry), role assignment |
+| P3-01 | RBAC implementation | M | `db/index.ts`, `routes/auth.ts`, `middleware/auth.ts`, `Sidebar.tsx` | ✅ Foundation done (Phase 3A). Remaining: route-level enforcement on existing endpoints |
+| P3-02 | Team management routes | M | `routes/team.ts` | 🚧 DB queries exist (invites, users). Need route handlers + frontend UI |
 | P3-03 | Accept-invite page | S | `pages/accept-invite.astro` | Token validation, username/password form, account creation |
-| P3-04 | Multi-server support | M | `routes/servers.ts`, `ServersPage.tsx` | Remote server registry + in-memory polling cache, server cards |
-| P3-05 | API key infrastructure | M | `routes/apikeys.ts`, `db/index.ts`, `middleware/auth.ts` | `api_keys` table, CRUD routes, `x-api-key` auth middleware |
-| P3-06 | Webhook engine | M | `routes/apikeys.ts`, `alerts.ts`, `db/index.ts` | `webhooks` table, CRUD, trigger in `fireAlert()` with HMAC |
+| P3-04 | Multi-server routes | M | `routes/servers.ts`, `ServersPage.tsx` | 🚧 DB + stub page exist. Need route handlers, polling loop, server cards |
+| P3-05 | API key routes + middleware | M | `routes/apikeys.ts`, `middleware/auth.ts` | 🚧 DB + stub page exist. Need CRUD routes + `x-api-key` middleware |
+| P3-06 | Webhook delivery | M | `routes/apikeys.ts`, `alerts.ts` | 🚧 DB exists. Need CRUD routes + wire `listWebhooks()` into `fireAlert()` |
 | P3-07 | Email invite delivery | M | `routes/team.ts` | Add nodemailer + SMTP config |
 
 ---
@@ -56,10 +58,10 @@
 | # | Task | Complexity | Notes |
 |---|---|---|---|
 | R-01 | Alert cooldown persistence | S | Add `last_fired_at` column to `alert_rules`; load on startup; prevents cooldown reset on restart |
-| R-02 | Warn on default JWT secret | S | `if (JWT_SECRET === 'dev-secret-change-me') console.warn(...)` in `index.ts` |
-| R-03 | Request body size limit | S | Add `bodyLimit: 1_048_576` to Fastify config in `index.ts` |
+| R-02 | Warn on default JWT secret | S | ✅ Done — console.warn added in Phase 3A |
+| R-03 | Request body size limit | S | ✅ Done — `bodyLimit: 1_048_576` added in Phase 3A |
 | R-04 | Remove unused dependencies | S | Remove: `node-telegram-bot-api`, `@fastify/websocket`, `clsx`, `tailwind-merge`, `@radix-ui/*` |
-| R-05 | Split `db/index.ts` into domain modules | M | File is 166 lines. Split into `db/users.ts`, `db/metrics.ts`, `db/alerts.ts` etc. |
+| R-05 | Split `db/index.ts` into domain modules | M | File grew to 366 lines (was 166 after Phase 3A). Contains 30+ query functions across 6 domains. Splitting becoming more urgent. |
 | R-06 | Use proper `cn()` (clsx + tailwind-merge) | S | Current `cn()` in `lib/utils.ts` is naive string join — doesn't handle Tailwind conflicts |
 | R-07 | Collector error telemetry | S | Log collector-specific errors in `collectAll()` instead of silently returning fallback |
 | R-08 | Fastify JSON schema on all POST routes | M | Add `schema.body` definitions (like login route has) |

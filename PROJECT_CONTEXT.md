@@ -19,12 +19,14 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **WebSocket Hub** | `ws/hub.ts` | Runs collection loop every 5s, broadcasts to Socket.IO clients, persists to SQLite |
 | **Alert Engine** | `alerts.ts` | Evaluates threshold rules after each collection tick, fires notifications, enforces cooldowns |
 | **Database** | `db/index.ts` | SQLite singleton, schema migration, all query functions |
-| **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint |
+| **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint. JWT contains `{ sub, username, role }`. `last_login_at` updated on login. |
 | **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query |
 | **Docker Routes** | `routes/docker.ts` | Container list, start/stop/restart/remove, log streaming |
 | **Status Route** | `routes/status.ts` | Public unauthenticated status page data |
 
 > 📋 **Planned (Phase 3-4)**: `routes/team.ts`, `routes/servers.ts`, `routes/billing.ts`, `routes/apikeys.ts`
+> 
+> 🚧 **In Progress (Phase 3A)**: `middleware/auth.ts` now has `requireAdmin` and `requireOwner`. `db/index.ts` has RBAC, invite, server, API key, and webhook query functions (tables + CRUD). Route handlers for team, servers, and API keys are not yet wired.
 
 ### Frontend (`apps/web`)
 
@@ -40,8 +42,12 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **History** | `history/HistoryPage.tsx` | Time-series charts with range selector (1h/6h/24h/7d) |
 | **Alerts** | `alerts/AlertsPage.tsx` | Alert events feed + rule management |
 | **Settings** | `alerts/SettingsPage.tsx` | Server info, notification config |
+| **Servers** | `servers/ServersPage.tsx` | 🚧 Stub — Coming in Phase 3C |
+| **Team** | `servers/TeamPage.tsx` | 🚧 Stub — Coming in Phase 3B |
+| **API Keys** | `saas/ApiKeysPage.tsx` | 🚧 Stub — Coming in Phase 3D |
 
-> 📋 **Planned (Phase 3-4)**: `servers/ServersPage.tsx`, `servers/TeamPage.tsx`, `saas/BillingPage.tsx`, `saas/ApiKeysPage.tsx`
+> 🚧 **In Progress (Phase 3)**: `ServersPage.tsx`, `TeamPage.tsx`, `ApiKeysPage.tsx` — stub components exist, full implementations planned for later sub-phases.
+> 📋 **Planned (Phase 4)**: `saas/BillingPage.tsx`
 
 ### Shared Types (`packages/types`)
 
@@ -49,9 +55,9 @@ Single file `src/index.ts` exports all interfaces shared between frontend and ba
 
 ---
 
-## User Roles (📋 Planned — not yet implemented)
+## User Roles (🚧 Phase 3A — foundation implemented)
 
-> Role-based access control is planned for Phase 3. Current code has no role system — all authenticated users have equal access.
+> RBAC types, DB schema, JWT role claims, and auth middleware are implemented. Route-level role enforcement and team management UIs are planned for later sub-phases.
 
 | Role | Permissions |
 |---|---|
@@ -68,8 +74,8 @@ Key implementation requirements: `role` column on `users` table, `role` claim in
 ### First-Run Setup
 1. `userCount() === 0` → `/api/auth/setup` is open
 2. POST with `username + password + email` → creates `owner` account
-3. JWT returned → stored in `localStorage` via `useAuthStore`
-4. Alternatively: set `ADMIN_USER` + `ADMIN_PASS` env vars → auto-created on boot
+3. JWT (with `{ sub, username, role: 'owner' }`) returned → stored in `localStorage` via `useAuthStore`
+4. Alternatively: set `ADMIN_USER` + `ADMIN_PASS` env vars → auto-created as `owner` on boot
 
 ### Metrics Collection Loop
 1. `createSocketServer()` calls `startCollection()` on boot

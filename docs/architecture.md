@@ -29,7 +29,7 @@ pulseos/                          # Monorepo root
 │   │       ├── db/
 │   │       │   └── index.ts      # SQLite singleton, migrate(), all query functions
 │   │       ├── middleware/
-│   │       │   └── auth.ts       # requireAuth — JWT verify via @fastify/jwt
+│   │       │   └── auth.ts       # requireAuth, requireAdmin, requireOwner — JWT verify + role checks
 │   │       ├── routes/
 │   │       │   ├── auth.ts       # /api/auth — login, setup, /me
 │   │       │   ├── metrics.ts    # /api/metrics — /now, /history, /api/alerts
@@ -46,24 +46,29 @@ pulseos/                          # Monorepo root
 │           │   └── status.astro      # Public status page (vanilla JS)
 │           ├── components/
 │           │   ├── App.tsx           # Auth gate → Dashboard or LoginPage
-│           │   ├── layout/
-│           │   │   ├── Sidebar.tsx   # Navigation, badges, sign-out
-│           │   │   └── Topbar.tsx    # Header, connection status
-│           │   ├── dashboard/
-│           │   │   ├── Dashboard.tsx # Page router (currentPage → component)
-│           │   │   ├── MetricCard.tsx
-│           │   │   └── NetworkPage.tsx
-│           │   ├── charts/
-│           │   │   └── SparkLine.tsx # Recharts AreaChart, 60-point rolling
-│           │   ├── containers/ContainersPage.tsx
-│           │   ├── history/HistoryPage.tsx
-│           │   ├── alerts/
-│           │   │   ├── AlertsPage.tsx
-│           │   │   └── SettingsPage.tsx
-│           │   ├── services/
-│           │   │   ├── ServicesTable.tsx
-│           │   │   ├── ProcessTable.tsx
-│           │   │   └── ProcessesPage.tsx
+│       │       ├── layout/
+│       │       │   ├── Sidebar.tsx   # Navigation with role filtering, badges, sign-out
+│       │       │   └── Topbar.tsx    # Header, connection status
+│       │       ├── dashboard/
+│       │       │   ├── Dashboard.tsx # Page router (currentPage → component)
+│       │       │   ├── MetricCard.tsx
+│       │       │   └── NetworkPage.tsx
+│       │       ├── charts/
+│       │       │   └── SparkLine.tsx # Recharts AreaChart, 60-point rolling
+│       │       ├── containers/ContainersPage.tsx
+│       │       ├── history/HistoryPage.tsx
+│       │       ├── alerts/
+│       │       │   ├── AlertsPage.tsx
+│       │       │   └── SettingsPage.tsx
+│       │       ├── services/
+│       │       │   ├── ServicesTable.tsx
+│       │       │   ├── ProcessTable.tsx
+│       │       │   └── ProcessesPage.tsx
+│       │       ├── servers/
+│       │       │   ├── ServersPage.tsx  # 🚧 Stub — Phase 3C
+│       │       │   └── TeamPage.tsx     # 🚧 Stub — Phase 3B
+│       │       ├── saas/
+│       │       │   └── ApiKeysPage.tsx  # 🚧 Stub — Phase 3D
 │           ├── hooks/useSocket.ts    # Socket.IO connection + store wiring
 │           ├── stores/metrics.ts     # Zustand — all live state
 │           └── lib/utils.ts         # fmtBytes, fmtUptime, fmtPct, etc.
@@ -136,7 +141,7 @@ Client → nginx (TLS termination)
   → proxy_pass localhost:3001
   → Fastify rate limiter (100/min per IP)
   → Route handler
-  → preHandler: requireAuth → req.jwtVerify()
+  → preHandler: requireAuth → req.jwtVerify() (with optional requireAdmin/requireOwner role check)
   → Handler logic → db/index.ts query
   → { ok: true, data: ... }
 ```
@@ -167,13 +172,16 @@ metrics_history  (id, ts, cpu, mem_used, mem_total, net_rx, net_tx)
 disk_history     (id, ts, mountpoint, used, total)    ← created but never written
 alert_rules      (id, name, metric, condition, threshold, severity, channels, cooldown, enabled, created_at)
 alert_events     (id, rule_id, rule_name, severity, message, value, threshold, fired_at, resolved_at)
-users            (id, username, password, created_at)
+users            (id, username, password, role, email, last_login_at, created_at)
+invites          (id, email, role, token, expires_at, created_by, created_at)
+servers          (id, name, host, api_url, api_token, tags, added_at)
+api_keys         (id, prefix, key_hash, scope, created_by, created_at, last_used_at)
+webhooks         (id, url, events, secret, enabled, created_at)
 
--- Planned (Phase 3-4):
--- users: add email, role, last_login_at columns
--- NEW tables: invites, servers, api_keys, webhooks, subscription
--- metrics_history/disk_history: add server_id column
+-- Planned (Phase 3B-4):
 -- alert_rules: add server_id column
+-- metrics_history, disk_history: add server_id column
+-- subscription table for billing
 ```
 
 ---

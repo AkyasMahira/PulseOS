@@ -76,17 +76,15 @@
 
 ---
 
-## D-07 — JWT Embedded Role Claim (📋 Planned)
+## D-07 — JWT Embedded Role Claim (✅ Implemented)
 
-**Decision (Planned)**: Embed `role` in the JWT payload rather than fetching it from DB on each request.
+**Decision**: Embed `role` in the JWT payload rather than fetching it from DB on each request.
 
 **Reason**: Avoids DB lookup on every authenticated request. Simplifies middleware.
 
-**Current State**: JWT payload is `{ sub: number, username: string }` — no role claim. `users` table has no `role` column. RBAC system is not yet implemented (planned for Phase 3).
+**Evidence**: `routes/auth.ts` — `app.jwt.sign({ sub: user.id, username: user.username, role: user.role })`. `middleware/auth.ts` — `requireAdmin` and `requireOwner` cast `req.user as JwtUser` and check `role` directly. Frontend `stores/metrics.ts` — `decodeRoleFromToken()` reads role from JWT payload via `atob()` for page-refresh persistence.
 
-**Evidence (planned)**: Will need: `app.jwt.sign({ sub: user.id, username, role: user.role }, ...)` in `routes/auth.ts`. Frontend will read role from JWT payload via `JSON.parse(atob(token.split('.')[1])).role`.
-
-**Impact (planned)**: Role changes won't take effect until user re-authenticates (token expiry or re-login). Acceptable for 7-day JWT expiry in a small team context.
+**Impact**: Role changes won't take effect until user re-authenticates (token expiry or re-login). Acceptable for 7-day JWT expiry in a small team context.
 
 ---
 
@@ -124,4 +122,40 @@
 
 **Current State**: Not yet implemented. No `routes/billing.ts` file exists. No `subscription` table. Planned for Phase 4.
 
-**Impact (planned)**: Plan changes require API redeployment. Cannot be changed at runtime. Self-hosters can easily override limits by editing the file.
+**Impact**: Plan changes require API redeployment. Cannot be changed at runtime. Self-hosters can easily override limits by editing the file.
+
+---
+
+## D-11 — Individual Middleware Functions per Role Level
+
+**Decision**: Create three separate middleware functions (`requireAuth`, `requireAdmin`, `requireOwner`) rather than a single parameterized middleware or `hasRole()` utility.
+
+**Reason**: Simple, explicit, and self-documenting at the route registration level. Each function has a clear, single responsibility. TypeScript provides type safety on the `JwtUser` interface.
+
+**Evidence**: `middleware/auth.ts` — Three exported async functions, each with `FastifyRequest` + `FastifyReply` signature. Route files import the exact middleware needed (e.g., `preHandler: requireAdmin`).
+
+**Impact**: Slightly more code than a single parameterized middleware, but dramatically clearer at call sites. Adding a new role level requires adding a new function.
+
+---
+
+## D-12 — DB Query Functions Before Route Handlers
+
+**Decision**: Implement all database access functions (CRUD for users, invites, servers, API keys, webhooks) before writing route handlers that use them.
+
+**Reason**: Separates data layer concerns from HTTP layer concerns. All query functions live in `db/index.ts` making it the single source of truth for DB access. Route handlers only call exported functions — never write raw SQL.
+
+**Evidence**: `db/index.ts` lines 209-366 contain 13 new query functions (user management, invites, servers, API keys, webhooks) with no corresponding route handlers yet. This follows the pattern set in AGENTS.md rule #2.
+
+**Impact**: Changes the development order for Phase 3 sub-phases: DB schema + queries first, then route handlers, then frontend pages. This commit completed the DB schema + query layer for all Phase 3 features at once.
+
+---
+
+## D-13 — Placeholder Stub Pages for Future Phases
+
+**Decision**: Add rendering entries in Dashboard.tsx and placeholder components for ServersPage, TeamPage, and ApiKeysPage before they are fully implemented.
+
+**Reason**: Enables adding navigation items and PageId types without breaking the dashboard. The stubs display "Coming in Phase 3B/3C/3D" messages, providing clear status to developers.
+
+**Evidence**: `components/servers/ServersPage.tsx` (9 lines) — returns placeholder div. `components/servers/TeamPage.tsx` (9 lines) — same pattern. `components/saas/ApiKeysPage.tsx` (9 lines) — same pattern. All wired into `Dashboard.tsx` router.
+
+**Impact**: Users will see placeholder pages if navigation allows access before features are implemented. Sidebar hides these pages from viewers via `requireRole` filter but owner/admin can access them.

@@ -17,7 +17,7 @@
 - **Status**: Implemented
 - Credentials verified with bcrypt (cost factor 12).
 - On success, returns a JWT signed with `JWT_SECRET`, expires in 7 days.
-- JWT payload contains: `{ sub: userId, username }` (no role — RBAC planned for Phase 3).
+- JWT payload contains: `{ sub: userId, username, role }`.
 - Failed login always returns the same error ("Invalid credentials") — no username enumeration.
 - `last_login_at` updated on each successful login.
 
@@ -29,34 +29,42 @@
 
 ---
 
-## 2. Role-Based Access Control (📋 Planned — Phase 3)
+## 2. Role-Based Access Control (🚧 Phase 3A — foundation implemented)
 
 ### BR-RBAC-01 — Role Hierarchy
-- **Status**: Planned
+- **Status**: 🚧 Partially Implemented
 - Three roles: `owner` > `admin` > `viewer`.
-- `viewer`: Read-only. Can view all dashboards. Cannot perform actions (container restart, alerts, team management).
+- Roles stored in `users.role` column (TEXT, default `'admin'`).
+- Role embedded in JWT `{ sub, username, role }` claim.
+- Middleware: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only).
+- Frontend sidebar filters nav items by `requireRole` array — `servers`, `team`, `apikeys` hidden from viewers.
+- `viewer`: Read-only. Can view all dashboards. Cannot perform actions (container restart, alerts, team management). ⚠️ Route-level enforcement not yet applied to most API endpoints.
 - `admin`: Can perform all monitoring actions. Can invite users (viewer or admin role only). Cannot access billing. Cannot delete owner.
 - `owner`: Full access including billing, team management, deleting users, assigning any role.
 
 ### BR-RBAC-02 — Role Assignment Constraints
-- **Status**: Planned
-- Only `owner` can change user roles.
+- **Status**: 🚧 Partially Implemented
+- `updateUserRole(id, role)` and `deleteUser(id)` exist in `db/index.ts`.
+- ⚠️ No route handlers call these functions yet — team management UI and API routes are planned for Phase 3B.
+- Only `owner` can change user roles (enforced via `requireOwner` middleware when route is implemented).
 - Only `owner` can delete users.
 - `owner` cannot delete themselves.
 - `admin` can only invite users with role `viewer` or `admin` (not `owner`).
 - There is no restriction on multiple owners (any owner can promote another user to owner).
 
 ### BR-RBAC-03 — Billing Page Visibility
-- **Status**: Planned
+- **Status**: 📋 Planned
 - Billing page only shown in sidebar for `owner` role.
 - Backend billing endpoints checked via role middleware.
 
 ---
 
-## 3. Team Invite Rules (📋 Planned — Phase 3)
+## 3. Team Invite Rules (🚧 Phase 3A — DB layer implemented)
 
 ### BR-TEAM-01 — Invite Lifecycle
-- **Status**: Planned
+- **Status**: 🚧 Partially Implemented
+- `invites` table and CRUD functions (`createInvite`, `getInviteByToken`, `listInvites`, `deleteInvite`) exist in `db/index.ts`.
+- ⚠️ No route handler or accept-invite page exists yet. Route handlers planned for Phase 3B.
 - Invite token is valid for **48 hours** from creation.
 - Tokens are UUID-based (32 hex characters after dashes stripped).
 - Expired invites are automatically excluded from `listInvites()` query.
@@ -64,7 +72,7 @@
 - Each invite is for a specific email address.
 
 ### BR-TEAM-02 — Invite Delivery
-- **Status**: Planned
+- **Status**: 📋 Planned
 - The API returns the invite URL in the response body.
 - Email sending requires nodemailer/SMTP integration.
 
@@ -124,21 +132,24 @@
 
 ---
 
-## 6. Multi-Server Rules (📋 Planned — Phase 3)
+## 6. Multi-Server Rules (🚧 Phase 3A — DB layer implemented)
 
 ### BR-SERVER-01 — Local Server
-- **Status**: Implemented
+- **Status**: ✅ Implemented
 - The local server is always present and is the primary monitored instance.
-- It is represented with `id: 'local'` in the frontend but is not stored in a `servers` table (as there is none yet).
+- It is represented with `id: 'local'` in the frontend but is not stored in the `servers` table.
 
 ### BR-SERVER-02 — Remote Servers
-- **Status**: Planned
+- **Status**: 🚧 Partially Implemented
+- `servers` table and CRUD functions (`addServer`, `listServers`, `getServer`, `removeServer`) exist in `db/index.ts`.
+- ⚠️ No route handler or polling loop exists yet. Route handlers planned for Phase 3C.
 - Remote servers will be polled via HTTP GET to `{apiUrl}/api/metrics/now`.
-- Authentication uses the stored `api_token` as a Bearer token.
+- Authentication uses the stored `apiToken` as a Bearer token.
 - Poll interval matches `COLLECT_INTERVAL_MS`.
 
 ### BR-SERVER-03 — API Token Security
-- **Status**: Planned (not yet implemented — no server routes exist)
+- **Status**: 🚧 Partially Implemented
+- ⚠️ `listServers()` returns `apiToken` directly. When route handlers are implemented, `apiToken` must be stripped from responses. The `ServerConfig` type has `apiToken: string` (not optional) — routes must never expose this field to clients.
 
 ---
 
@@ -158,19 +169,22 @@
 
 ---
 
-## 8. API Key Rules (📋 Planned — Phase 3)
+## 8. API Key Rules (🚧 Phase 3A — DB layer implemented)
 
 ### BR-APIKEY-01 — Key Lifecycle
-- **Status**: Planned
+- **Status**: 🚧 Partially Implemented
+- `api_keys` table and CRUD functions (`createApiKey`, `listApiKeys`, `getApiKeyByHash`, `touchApiKey`, `revokeApiKey`) exist in `db/index.ts`.
+- ⚠️ No route handler or `x-api-key` middleware exists yet. Route handlers planned for Phase 3D.
 - Keys with `pk_` prefix, 32 hex characters.
 - Full key returned once at creation, never again.
-- `key_prefix` (first 10 chars) for display.
+- `prefix` (first 10 chars) for display.
 - Keys scoped: `read`, `write`, `admin`.
 - Keys belong to the creating user.
 
 ### BR-APIKEY-02 — Key Authentication
-- **Status**: Planned
-- Requires `api_keys` table + auth middleware checking `x-api-key` header.
+- **Status**: 🚧 Partially Implemented
+- `getApiKeyByHash()` and `touchApiKey()` exist for verification and last-used tracking.
+- ⚠️ No `x-api-key` header check middleware exists yet. Planned for Phase 3D.
 
 ---
 

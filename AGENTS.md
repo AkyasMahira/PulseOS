@@ -73,7 +73,7 @@ pulseos/
 ### API Routes
 - All routes registered in `apps/api/src/index.ts` via `app.register()`.
 - Each route file exports one `async function xxxRoutes(app: FastifyInstance)`.
-- Auth: use `requireAuth` (viewer+) or inline `requireAdmin`/`requireOwner` from `routes/team.ts` pattern.
+- Auth: use `requireAuth` (viewer+) or `requireAdmin`/`requireOwner` from `middleware/auth.ts`.
 - Always return `{ ok: true, data: ... }` or `{ ok: false, error: string }`.
 
 ### Database
@@ -101,8 +101,8 @@ pulseos/
 1. **Linux-only collectors**: All `apps/api/src/collectors/` files read from `/proc/*` and `/etc/hostname`. They will FAIL on macOS/Windows. Wrap in try/catch with fallbacks (already done in `collectors/index.ts`).
 2. **Single SQLite instance**: `getDb()` returns a singleton. Never create a second Database instance.
 3. **No migrations system**: `migrate()` uses `CREATE IF NOT EXISTS`. Adding columns to existing tables requires `ALTER TABLE` statements appended to `migrate()`.
-4. **No RBAC (Planned)**: Current code has no role system. `users` table is `(id, username, password, created_at)`. Role-based access control (owner/admin/viewer) is planned for Phase 3.
-5. **JWT payload shape**: `{ sub: number, username: string }` — role is NOT currently embedded. Adding a role claim requires updating JWT sign in `auth.ts`, DB schema, and all role checks. Planned for Phase 3.
+4. **RBAC implemented (Phase 3A)**: Three roles: `owner` > `admin` > `viewer`. `users` table now has `role`, `email`, `last_login_at` columns. JWT contains `{ sub, username, role }`. Middleware stack: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only). Frontend sidebar filters nav items by role.
+5. **JWT payload shape**: `{ sub: number, username: string, role: UserRole }` — role is embedded in JWT, decoded client-side via `decodeRoleFromToken()` for refresh persistence. Role stored in Zustand `useAuthStore` + `localStorage(pulse_role)`.
 6. **Astro output is static**: `output: 'static'` in `astro.config.mjs`. All data fetching happens client-side.
 
 ---
@@ -115,7 +115,7 @@ pulseos/
 | Stripe webhook | Signature NOT cryptographically verified | Marked as simplified — see `billing.ts:137` |
 | API key storage | Stored as plaintext (`key_hash` column is actually raw key) | `db/index.ts:308` comment acknowledges this |
 | Docker socket | `/var/run/docker.sock` exposed to API process | Run API as non-root with socket access via group |
-| `requireAuth` middleware | Does not return after `reply.send()` — async flow continues | Low risk but technically incomplete |
+| `requireAuth` middleware | Fixed in Phase 3A — `return` added after `reply.send()` | ✅ Fixed |
 | CORS | Single origin from `WEB_ORIGIN` env | OK for self-hosted, needs updating for SaaS |
 | Rate limiting | 100 req/min per IP globally | May need per-route tuning for production |
 | Public `/status` endpoint | No auth, CORS `*` | By design — public status page |
@@ -133,3 +133,6 @@ pulseos/
 7. **When adding a new page**: (a) add `PageId` to types, (b) add nav item to `Sidebar.tsx`, (c) add title to `PAGE_TITLES` in `Dashboard.tsx`, (d) add render condition in Dashboard router.
 8. **DB schema changes require appending to `migrate()` only** — never recreate tables.
 9. **Do not use `node-telegram-bot-api` package** — it's in `package.json` but alerts use direct `fetch()` to Telegram API. The package is dead weight.
+10. **When adding a new protected route**: (a) use `requireAuth` for viewer+ access, (b) use `requireAdmin` for owner/admin access, (c) use `requireOwner` for owner-only access — all from `middleware/auth.ts`. Never inline role checks.
+11. **Body limit is enforced**: Fastify `bodyLimit: 1_048_576` (1MB). Do not remove or increase without careful consideration for 2GB VPS memory budget.
+12. **`ALTER TABLE ADD COLUMN` is not idempotent in SQLite** — it will fail if the column already exists. New columns must be added inside a migration guard (check if column exists via `PRAGMA table_info`) or handled with try/catch.
