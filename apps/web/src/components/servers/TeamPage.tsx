@@ -238,26 +238,37 @@ export function TeamPage() {
             </div>
           )}
 
-          {invites.map(invite => (
-            <div key={invite.id} className="bg-surface-2 border border-surface-border rounded-lg px-4 py-3 flex items-center gap-3">
+          {invites.map(invite => {
+            const expired = Date.now() > invite.expiresAt
+            const hoursLeft = Math.max(0, Math.ceil((invite.expiresAt - Date.now()) / 3600000))
+            const inviteUrl = `${API_URL.replace(':3001', ':4321')}/accept-invite?token=${invite.token}`
+
+            return (
+            <div key={invite.id} className={`bg-surface-2 border rounded-lg px-4 py-3 flex items-center gap-3 ${expired ? 'border-red-900/30 opacity-60' : 'border-surface-border'}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <Mail size={11} className="text-slate-500" />
                   <span className="text-xs text-slate-300 font-mono">{invite.email}</span>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${ROLE_COLORS[invite.role]}`}>{invite.role}</span>
+                  {expired && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900/30 font-mono">Expired</span>}
                 </div>
                 <div className="text-[10px] text-slate-600 font-mono flex items-center gap-2">
-                  <Clock size={10} /> Expires {formatDate(invite.expiresAt)}
-                  <span className="text-slate-700">·</span>
-                  <span>{invite.token.slice(0, 12)}...</span>
+                  <Clock size={10} />
+                  {expired ? 'Expired' : `${hoursLeft}h remaining`}
                 </div>
               </div>
+              {!expired && (
+                <button onClick={() => navigator.clipboard.writeText(inviteUrl)}
+                  className="text-slate-600 hover:text-blue-400 transition-colors" title="Copy invite link">
+                  <Copy size={13} />
+                </button>
+              )}
               <button onClick={() => removeInvite(invite.id)}
                 className="text-slate-600 hover:text-red-400 transition-colors">
                 <Trash2 size={13} />
               </button>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>

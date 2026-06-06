@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
-import { getMetricsHistory, getRecentAlerts, getAlertRules, insertAlertRule } from '../db/index.js'
+import { getMetricsHistory, getRecentAlerts, getAlertRules, insertAlertRule, updateAlertRule, deleteAlertRule, getAllAlertRules } from '../db/index.js'
 import { collectAll } from '../collectors/index.js'
 
 export async function metricsRoutes(app: FastifyInstance) {
@@ -47,5 +47,26 @@ export async function alertRoutes(app: FastifyInstance) {
     } catch (e) {
       return reply.code(400).send({ ok: false, error: String(e) })
     }
+  })
+
+  // GET /api/alerts/rules/all  (includes disabled)
+  app.get('/rules/all', { preHandler: requireAdmin }, async () => {
+    return { ok: true, data: getAllAlertRules() }
+  })
+
+  // PUT /api/alerts/rules/:id
+  app.put<{ Params: { id: string }; Body: any }>('/rules/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    try {
+      updateAlertRule(req.params.id, req.body as any)
+      return { ok: true }
+    } catch (e) {
+      return reply.code(400).send({ ok: false, error: String(e) })
+    }
+  })
+
+  // DELETE /api/alerts/rules/:id
+  app.delete<{ Params: { id: string } }>('/rules/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    deleteAlertRule(req.params.id)
+    return { ok: true }
   })
 }

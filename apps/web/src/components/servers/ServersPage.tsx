@@ -69,6 +69,9 @@ function AddServerForm({ onAdded, onCancel }: { onAdded: () => void; onCancel: (
         <div className="col-span-2">
           <label className="text-[9px] text-slate-600 uppercase tracking-widest font-mono block mb-1">API Token</label>
           <input className={inp} type="password" placeholder="JWT token from remote PulseOS" value={form.apiToken} onChange={e => setForm(f => ({ ...f, apiToken: e.target.value }))} />
+          <div className="text-[9px] text-slate-600 font-mono mt-1 leading-relaxed">
+            Login to the remote PulseOS dashboard, then open DevTools (F12) → Application → Local Storage → copy <code className="text-slate-500 bg-surface-3 px-1 rounded">pulse_token</code> value. You can also find your token on your local Profile page.
+          </div>
         </div>
       </div>
       {error && <div className="text-[10px] text-red-400 font-mono mt-2">{error}</div>}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMetricsStore, useAuthStore } from '../../stores/metrics'
 import { fmtBytes, fmtPct } from '../../lib/utils'
-import { Play, Square, RotateCcw, Terminal, ChevronDown, ChevronRight } from 'lucide-react'
+import { Play, Square, RotateCcw, Terminal, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 
 const API_URL = import.meta.env.PUBLIC_API_URL ?? 'http://localhost:3001'
 
@@ -76,12 +76,20 @@ export function ContainersPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const doAction = async (id: string, action: string) => {
+    if (action === 'delete' && !confirm('Delete this container?')) return
     setActionLoading(`${id}:${action}`)
     try {
-      await fetch(`${API_URL}/api/docker/${id}/${action}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      if (action === 'delete') {
+        await fetch(`${API_URL}/api/docker/${id}?force=true`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } else {
+        await fetch(`${API_URL}/api/docker/${id}/${action}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      }
     } catch { /* ignore — ws will update state */ }
     finally { setActionLoading(null) }
   }
@@ -201,6 +209,14 @@ export function ContainersPage() {
                     title="Logs"
                   >
                     <Terminal size={12} />
+                  </button>
+                  <button
+                    onClick={() => doAction(c.id, 'delete')}
+                    disabled={!!isLoading}
+                    className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-colors disabled:opacity-40"
+                    title="Delete"
+                  >
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </div>

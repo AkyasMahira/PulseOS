@@ -116,6 +116,11 @@ function migrate(db: Database.Database) {
       enabled      INTEGER NOT NULL DEFAULT 1,
       created_at   INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key          TEXT PRIMARY KEY,
+      value        TEXT NOT NULL
+    );
   `)
 
   // Phase 3: guarded column additions (SQLite lacks ADD COLUMN IF NOT EXISTS)
@@ -186,6 +191,32 @@ export function insertAlertRule(rule: Omit<AlertRule, 'id'>): string {
   `).run(id, rule.name, rule.metric, rule.condition, rule.threshold, rule.severity,
     JSON.stringify(rule.channels), rule.cooldownSecs, rule.enabled ? 1 : 0, Date.now())
   return id
+}
+
+export function updateAlertRule(id: string, rule: Partial<Omit<AlertRule, 'id'>>) {
+  const sets: string[] = []
+  const vals: any[] = []
+  if (rule.name !== undefined) { sets.push('name = ?'); vals.push(rule.name) }
+  if (rule.enabled !== undefined) { sets.push('enabled = ?'); vals.push(rule.enabled ? 1 : 0) }
+  if (rule.threshold !== undefined) { sets.push('threshold = ?'); vals.push(rule.threshold) }
+  if (rule.cooldownSecs !== undefined) { sets.push('cooldown = ?'); vals.push(rule.cooldownSecs) }
+  if (rule.channels !== undefined) { sets.push('channels = ?'); vals.push(JSON.stringify(rule.channels)) }
+  if (sets.length === 0) return
+  vals.push(id)
+  getDb().prepare(`UPDATE alert_rules SET ${sets.join(', ')} WHERE id = ?`).run(...vals)
+}
+
+export function deleteAlertRule(id: string) {
+  getDb().prepare('DELETE FROM alert_rules WHERE id = ?').run(id)
+}
+
+export function getAllAlertRules(): AlertRule[] {
+  return (getDb().prepare('SELECT * FROM alert_rules').all() as any[]).map(r => ({
+    ...r,
+    channels: JSON.parse(r.channels),
+    enabled: r.enabled === 1,
+    cooldownSecs: r.cooldown,
+  }))
 }
 
 // ── Alert events ─────────────────────────────────────────────────────────────
@@ -261,6 +292,10 @@ export function deleteUser(id: number) {
 
 export function updateLastLogin(id: number) {
   getDb().prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(Date.now(), id)
+}
+
+export function updateUserPassword(id: number, hashedPassword: string) {
+  getDb().prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, id)
 }
 
 export function userCount(): number {
@@ -390,4 +425,20 @@ export function listWebhooks(): Webhook[] {
 
 export function deleteWebhook(id: string) {
   getDb().prepare('DELETE FROM webhooks WHERE id = ?').run(id)
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export function getSetting(key: string): string | undefined {
+  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
+  return row?.value
+}
+
+export function setSetting(key: string, value: string) {
+  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value)
+}
+
+export function getAllSettings(): Record<string, string> {
+  const rows = getDb().prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]
+  return Object.fromEntries(rows.map(r => [r.key, r.value]))
 }

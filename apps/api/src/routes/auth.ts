@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
-import { getUserByUsername, insertUser, userCount, updateLastLogin } from '../db/index.js'
+import { getUserByUsername, insertUser, userCount, updateLastLogin, updateUserPassword } from '../db/index.js'
 
 export async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/login
@@ -53,5 +53,47 @@ export async function authRoutes(app: FastifyInstance) {
     },
   }, async (req) => {
     return { ok: true, data: req.user }
+  })
+
+  // PUT /api/auth/password
+  app.put<{ Body: { currentPassword: string; newPassword: string } }>('/password', {
+    preHandler: async (req, reply) => {
+      try { await req.jwtVerify() }
+      catch { reply.code(401).send({ ok: false, error: 'unauthorized' }); return }
+    },
+    schema: {
+      body: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', minLength: 1 },
+          newPassword: { type: 'string', minLength: 8, maxLength: 128 },
+        },
+      },
+    },
+  }, async (req, reply) => {
+    const { currentPassword, newPassword } = req.body
+    const jwtUser = (req as any).user
+    const user = getUserByUsername(jwtUser.username)
+
+    if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+      return reply.code(400).send({ ok: false, error: 'Current password is incorrect' })
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12)
+    updateUserPassword(user.id, hashed)
+    return { ok: true }
+  })
+
+  // GET /api/auth/token  (shows current JWT — useful for multi-server)
+  app.get('/token', {
+    preHandler: async (req, reply) => {
+      try { await req.jwtVerify() }
+      catch { reply.code(401).send({ ok: false, error: 'unauthorized' }) }
+    },
+  }, async (req) => {
+    const authHeader = req.headers.authorization ?? ''
+    const token = authHeader.replace('Bearer ', '')
+    return { ok: true, data: { token } }
   })
 }

@@ -2,7 +2,7 @@ import { useMetricsStore } from '../../stores/metrics'
 import type { PageId, UserRole } from '@pulseos/types'
 import {
   LayoutDashboard, Container, Cpu, Activity, Bell,
-  BarChart2, Settings, LogOut, Server, Users, Key
+  BarChart2, Settings, LogOut, Server, Users, Key, User
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/metrics'
 
@@ -17,6 +17,7 @@ const NAV: { id: PageId; label: string; icon: any; section?: string; requireRole
   { id: 'servers',     label: 'Servers',     icon: Server, requireRole: ['owner', 'admin'] },
   { id: 'team',        label: 'Team',        icon: Users, requireRole: ['owner', 'admin'] },
   { id: 'apikeys',     label: 'API Keys',    icon: Key, requireRole: ['owner', 'admin'] },
+  { id: 'profile',     label: 'Profile',      icon: User },
 ]
 
 const ROLE_LABELS: Record<UserRole, string> = {

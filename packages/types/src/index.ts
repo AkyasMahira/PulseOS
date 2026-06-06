@@ -244,3 +244,4 @@ export type PageId =
   | 'servers'
   | 'team'
   | 'apikeys'
+  | 'profile'
