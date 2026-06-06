@@ -25,7 +25,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   viewer: 'viewer',
 }
 
-export function Sidebar() {
+export function Sidebar({ onNavClick }: { onNavClick?: () => void }) {
   const { currentPage, setPage, alerts, services } = useMetricsStore()
   const { username, role, clearAuth } = useAuthStore()
 
@@ -68,7 +68,7 @@ export function Sidebar() {
                 </div>
               )}
               <button
-                onClick={() => setPage(item.id)}
+                onClick={() => { setPage(item.id); onNavClick?.() }}
                 className={`w-full flex items-center gap-2.5 px-4 py-2 text-xs transition-all border-l-2 font-mono ${
                   isActive
                     ? 'text-slate-100 border-accent-blue bg-accent-blue/5'

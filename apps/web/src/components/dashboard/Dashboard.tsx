@@ -92,7 +92,7 @@ export function Dashboard() {
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
           <div className="absolute left-0 top-0 bottom-0 w-48 z-50" onClick={e => e.stopPropagation()}>
-            <Sidebar />
+      <Sidebar onNavClick={() => setMobileMenuOpen(false)} />
           </div>
         </div>
       )}
