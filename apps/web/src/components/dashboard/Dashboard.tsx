@@ -16,6 +16,7 @@ import { ProcessesPage } from '../services/ProcessesPage'
 import { ServersPage } from '../servers/ServersPage'
 import { TeamPage } from '../servers/TeamPage'
 import { ApiKeysPage } from '../saas/ApiKeysPage'
+import { ErrorState } from '../shared/ErrorState'
 import { fmtBytes, fmtBytesPerSec, fmtUptime, fmtPct } from '../../lib/utils'
 import { Cpu, HardDrive, ArrowDownUp, Clock, Activity, MemoryStick, Bell } from 'lucide-react'
 
@@ -112,6 +113,11 @@ export function Dashboard() {
 
         {/* Page content */}
         <div className="flex-1 overflow-y-auto">
+          {!PAGE_TITLES[currentPage] && (
+            <div className="p-4 animate-fade-in">
+              <ErrorState type="404" />
+            </div>
+          )}
           {currentPage === 'overview'   && <OverviewPage />}
           {currentPage === 'containers' && <ContainersPage />}
           {currentPage === 'processes'  && <ProcessesPage />}
