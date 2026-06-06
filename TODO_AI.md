@@ -8,30 +8,23 @@
 
 | # | Task | Complexity | Files | Notes |
 |---|---|---|---|---|
-| IP-01 | Alert auto-resolution | S | `alerts.ts`, `db/index.ts` | Track active rule IDs in memory; UPDATE resolved_at when rule stops firing |
-| IP-02 | Disk history writes | S | `ws/hub.ts`, `db/index.ts` | Add `insertDiskHistory()` + call in `tick()` for each disk |
-| IP-03 | RBAC route enforcement | M | `routes/*` | ✅ Done (Phase 3E) — `requireAdmin` applied to docker actions and alert rule creation |
-| IP-04 | ALTER TABLE idempotency | S | `db/index.ts` | ✅ Done — ALTER TABLE wrapped in try/catch loop |
+| — | *None — all IP tasks completed in v1 sprint* | — | — | — |
 
 ---
 
-## 📋 v1 Release Sprint (Pre-release Hardening)
+## ✅ v1 Release Sprint (Completed)
 
-> Tasks required before v1.0 public release. Complexity: **S** = Small (< 2h) | **M** = Medium (2-8h)
-
-| # | Task | Complexity | Priority | Files | Notes |
-|---|---|---|---|---|---|
-| V1-01 | Enforce JWT secret in production | S | 🔴 Critical | `index.ts` | `process.exit(1)` if `JWT_SECRET === 'dev-secret-change-me'` and `NODE_ENV === 'production'` |
-| V1-02 | Input validation on all POST routes | M | 🔴 Critical | All route files | Fastify JSON `schema.body` on team, servers, apikeys POST endpoints |
-| V1-03 | Remove unused dependencies | S | 🔴 Critical | `package.json` (both apps) | `node-telegram-bot-api`, `@fastify/websocket`, `clsx`, `tailwind-merge`, `@radix-ui/*` |
-| V1-04 | Alert auto-resolution | S | 🟡 Important | `alerts.ts`, `db/index.ts` | Track active rule IDs; UPDATE `resolved_at` when rule stops firing |
-| V1-05 | Disk history writes | S | 🟡 Important | `ws/hub.ts`, `db/index.ts` | `insertDiskHistory()` + call in `tick()` for each disk |
-| V1-06 | Alert cooldown persistence | S | 🟡 Important | `alerts.ts`, `db/index.ts` | Persist `last_fired_at` to `alert_rules` table to survive restarts |
-| V1-07 | API key hashing | S | 🔴 Critical | `db/index.ts`, `middleware/auth.ts`, `routes/apikeys.ts` | Hash keys with `sha256` before storing in `key_hash`; update `requireApiKey` to compare hash |
-| V1-08 | Mobile sidebar drawer | S | 🟢 Nice-to-have | `Dashboard.tsx`, `Sidebar.tsx` | `mobileMenuOpen` state exists; wire hamburger toggle for `<lg` screens |
-| V1-09 | Audit log for destructive actions | M | 🟢 Nice-to-have | All route files | Log container actions, user deletion, role changes, invite creation |
-
-**Total estimate**: ~8-12 hours for the full sprint. V1-01 through V1-07 alone (~6 hours) cover all critical security and correctness issues for a production-ready release.
+| # | Task | Complexity | Status | Notes |
+|---|---|---|---|---|
+| V1-01 | Enforce JWT secret in production | S | ✅ | `process.exit(1)` if default in production |
+| V1-02 | Input validation on all POST routes | M | ✅ | Fastify JSON schema on 6 endpoints |
+| V1-03 | Remove unused dependencies | S | ✅ | 6 packages removed from api + web |
+| V1-04 | Alert auto-resolution | S | ✅ | `resolveAlertsForRule()` on next tick |
+| V1-05 | Disk history writes | S | ✅ | `insertDiskHistory()` in WS tick loop |
+| V1-06 | Alert cooldown persistence | S | ✅ | Persisted to `alert_rules.last_fired_at` |
+| V1-07 | API key hashing | S | ✅ | sha256 before store, sha256 on compare |
+| V1-08 | Mobile sidebar drawer | S | ✅ | Hamburger toggle with auto-close |
+| V1-09 | Audit log for destructive actions | M | 📋 Deferred to v1.1 | Log container/user mutations |
 
 ---
 
@@ -77,15 +70,15 @@
 
 | # | Task | Complexity | Notes |
 |---|---|---|---|
-| R-01 | Alert cooldown persistence | S | Add `last_fired_at` column to `alert_rules`; load on startup; prevents cooldown reset on restart |
+| R-01 | Alert cooldown persistence | S | ✅ Done (V1-06) — persisted to alert_rules.last_fired_at |
 | R-02 | Warn on default JWT secret | S | ✅ Done — console.warn added in Phase 3A |
 | R-03 | Request body size limit | S | ✅ Done — `bodyLimit: 1_048_576` added in Phase 3A |
-| R-04 | Remove unused dependencies | S | Remove: `node-telegram-bot-api`, `@fastify/websocket`, `clsx`, `tailwind-merge`, `@radix-ui/*` |
-| R-05 | Split `db/index.ts` into domain modules | M | File grew to 366 lines (was 166 after Phase 3A). Contains 30+ query functions across 6 domains. Splitting becoming more urgent. |
-| R-06 | Use proper `cn()` (clsx + tailwind-merge) | S | Current `cn()` in `lib/utils.ts` is naive string join — doesn't handle Tailwind conflicts |
-| R-07 | Collector error telemetry | S | Log collector-specific errors in `collectAll()` instead of silently returning fallback |
-| R-08 | Fastify JSON schema on all POST routes | M | Add `schema.body` definitions (like login route has) |
-| R-09 | Docker log stream demultiplexing | S | Strip 8-byte Docker multiplexed frame headers from log output |
+| R-04 | Remove unused dependencies | S | ✅ Done (V1-03) — 6 packages removed |
+| R-05 | Split `db/index.ts` into domain modules | M | File at ~384 lines with 35+ query functions. Splitting becoming urgent. |
+| R-06 | Use proper `cn()` (clsx + tailwind-merge) | S | Current `cn()` in `lib/utils.ts` is naive string join |
+| R-07 | Collector error telemetry | S | Log collector-specific errors in `collectAll()` |
+| R-08 | Fastify JSON schema on all POST routes | M | ✅ Done (V1-02) — schema.body on all 6 POST endpoints |
+| R-09 | Docker log stream demultiplexing | S | Strip 8-byte Docker multiplexed frame headers |
 
 ---
 
@@ -93,8 +86,8 @@
 
 | # | Task | Complexity | Priority |
 |---|---|---|---|
-| S-01 | Enforce JWT secret in production | S | High |
-| S-02 | Input validation schemas on all routes | M | High |
+| S-01 | Enforce JWT secret in production | S | ✅ Done (V1-01) — process.exit(1) in production |
+| S-02 | Input validation schemas on all routes | M | ✅ Done (V1-02) — JSON schema on 6 POST endpoints |
 | S-03 | Audit log for destructive actions | M | Medium |
 
 ---

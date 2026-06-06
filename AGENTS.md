@@ -55,6 +55,7 @@ pulseos/
 │       │   ├── services/    # ServicesTable, ProcessTable, ProcessesPage
 │       │   ├── servers/     # ServersPage, TeamPage
 │       │   ├── saas/        # BillingPage, ApiKeysPage
+│       │   ├── shared/      # ErrorBoundary, ErrorState
 │       │   └── layout/      # Sidebar, Topbar
 │       ├── hooks/useSocket.ts
 │       ├── stores/metrics.ts
@@ -113,12 +114,13 @@ pulseos/
 
 | Area | Risk | Current State |
 |---|---|---|
-| `JWT_SECRET` env var | Defaults to `'dev-secret-change-me'` if not set | **Must be overridden in production** |
+| `JWT_SECRET` env var | Defaults to `'dev-secret-change-me'` if not set | `process.exit(1)` in production — enforced in V1-01 |
 | Stripe webhook | Signature NOT cryptographically verified | Marked as simplified — see `billing.ts:137` |
-| API key storage | Stored as plaintext (`key_hash` column is actually raw key) | `db/index.ts:308` comment acknowledges this |
+| API key storage | Keys now hashed with sha256 before storage (V1-07) | `key_hash` column stores sha256 hash |
 | Docker socket | `/var/run/docker.sock` exposed to API process; container mutations gated behind `requireAdmin` (Phase 3E) | Run API as non-root with socket access via group |
 | `requireAuth` middleware | Fixed in Phase 3A — `return` added after `reply.send()` | ✅ Fixed |
-| `x-api-key` auth | API keys validated via `requireApiKey` middleware; stored as plaintext in `api_keys` table | Implemented but plaintext storage remains a risk |
+| `x-api-key` auth | API keys validated via `requireApiKey` middleware; hashed with sha256 | ✅ Implemented |
+| Input validation | Fastify JSON schema on all POST routes (V1-02) | ✅ Fixed |
 | CORS | Single origin from `WEB_ORIGIN` env | OK for self-hosted, needs updating for SaaS |
 | Rate limiting | 100 req/min per IP globally | May need per-route tuning for production |
 | Public `/status` endpoint | No auth, CORS `*` | By design — public status page |
@@ -135,10 +137,11 @@ pulseos/
 6. **Always use `font-mono` on metric values** — part of the terminal-inspired design contract.
 7. **When adding a new page**: (a) add `PageId` to types, (b) add nav item to `Sidebar.tsx`, (c) add title to `PAGE_TITLES` in `Dashboard.tsx`, (d) add render condition in Dashboard router.
 8. **DB schema changes require appending to `migrate()` only** — never recreate tables.
-9. **Do not use `node-telegram-bot-api` package** — it's in `package.json` but alerts use direct `fetch()` to Telegram API. The package is dead weight.
+9. **Do not use `node-telegram-bot-api` package** — previously in `package.json` but removed (V1-03). Alerts use direct `fetch()` to Telegram API.
 10. **When adding a new protected route**: (a) use `requireAuth` for viewer+ access, (b) use `requireAdmin` for owner/admin access, (c) use `requireOwner` for owner-only access — all from `middleware/auth.ts`. Never inline role checks.
 11. **Body limit is enforced**: Fastify `bodyLimit: 1_048_576` (1MB). Do not remove or increase without careful consideration for 2GB VPS memory budget.
 12. **`ALTER TABLE ADD COLUMN` is not idempotent in SQLite** — it will fail if the column already exists. Wrap each ALTER TABLE in try/catch after the main `db.exec()` block. Never place bare ALTER TABLE inside the shared exec call.
 13. **Accept-invite pages use vanilla JS** — `accept-invite.astro` follows the `status.astro` pattern: self-contained HTML + inline `<script type="module">`, no React. Target user is not yet authenticated when visiting this page.
 14. **Webhook secrets are auto-generated** — `createWebhook()` in `routes/apikeys.ts` generates a 24-char secret via `crypto.randomUUID()`. The secret is returned once at creation and stored in the `webhooks` table. No HMAC signature generation is performed on outgoing webhook payloads.
 15. **Two `.env` files, different scopes**: Root `.env` is for backend (`process.env` via `import 'dotenv/config'`). `apps/web/.env` is for frontend (`PUBLIC_API_URL` via Astro/Vite `define`). They do NOT share variables. Backend env vars go in root `.env`; frontend `PUBLIC_*` vars go in `apps/web/.env`.
+16. **Error pages use shared components**: `ErrorBoundary` wraps the root `<App />` to catch React crashes. `ErrorState` provides 5 typed error views (404, 500, offline, crash, generic). Always use `ErrorState` for error display — never inline error UI.
