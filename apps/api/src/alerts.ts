@@ -1,5 +1,5 @@
 import type { SystemSnapshot, ServiceStatus, AlertRule, AlertEvent } from '@pulseos/types'
-import { getAlertRules, insertAlertEvent, listWebhooks, resolveAlertsForRule, updateAlertLastFired, loadAlertCooldowns } from './db/index.js'
+import { getAlertRules, insertAlertEvent, listWebhooks, resolveAlertsForRule, updateAlertLastFired, loadAlertCooldowns, getSetting } from './db/index.js'
 
 const lastFired = loadAlertCooldowns()
 const activeRules = new Set<string>()
@@ -12,8 +12,8 @@ function checkCondition(value: number, condition: string, threshold: number): bo
 }
 
 async function sendTelegram(message: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+  const token = getSetting('TELEGRAM_BOT_TOKEN') || process.env.TELEGRAM_BOT_TOKEN
+  const chatId = getSetting('TELEGRAM_CHAT_ID') || process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) return
 
   try {
@@ -28,7 +28,7 @@ async function sendTelegram(message: string) {
 }
 
 async function sendDiscord(message: string) {
-  const url = process.env.DISCORD_WEBHOOK_URL
+  const url = getSetting('DISCORD_WEBHOOK_URL') || process.env.DISCORD_WEBHOOK_URL
   if (!url) return
 
   try {

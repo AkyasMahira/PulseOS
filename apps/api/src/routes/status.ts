@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { getDb } from '../db/index.js'
+import { getDb, getSetting } from '../db/index.js'
 import { collectServices } from '../collectors/services.js'
 import type { StatusPage } from '@pulseos/types'
 
@@ -46,8 +46,8 @@ export async function statusRoutes(app: FastifyInstance) {
     const hasDegraded = statusServices.some(s => s.status === 'degraded')
 
     const page: StatusPage = {
-      title: process.env.STATUS_PAGE_TITLE ?? 'System Status',
-      description: process.env.STATUS_PAGE_DESC ?? 'Real-time service status',
+      title: getSetting('STATUS_PAGE_TITLE') || (process.env.STATUS_PAGE_TITLE ?? 'System Status'),
+      description: getSetting('STATUS_PAGE_DESC') || (process.env.STATUS_PAGE_DESC ?? 'Real-time service status'),
       services: statusServices,
       incidents: incidents.map(i => ({ ...i, id: String(i.id) })),
       overallStatus: hasOutage ? 'outage' : hasDegraded ? 'degraded' : 'operational',
