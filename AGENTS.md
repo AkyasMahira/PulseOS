@@ -44,6 +44,8 @@ pulseos/
 │   │   ├── ws/hub.ts        # Socket.IO broadcaster + collection loop
 │   │   ├── alerts.ts        # Threshold engine + notification dispatch (Telegram, Discord, Webhooks)
 │   │   ├── middleware/auth.ts  # requireAuth, requireAdmin, requireOwner, requireApiKey
+│   │   ├── routes/
+│   │   │   ├── settings.ts   # /api/settings — key-value config storage (DB-backed)
 │   └── web/src/
 │       ├── .env              # Frontend PUBLIC_API_URL (Astro/Vite)
 │       ├── components/
@@ -53,7 +55,7 @@ pulseos/
 │       │   ├── history/     # HistoryPage
 │       │   ├── alerts/      # AlertsPage, SettingsPage
 │       │   ├── services/    # ServicesTable, ProcessTable, ProcessesPage
-│       │   ├── servers/     # ServersPage, TeamPage
+│       │   ├── servers/     # ServersPage, TeamPage, ProfilePage
 │       │   ├── saas/        # BillingPage, ApiKeysPage
 │       │   ├── shared/      # ErrorBoundary, ErrorState
 │       │   └── layout/      # Sidebar, Topbar
@@ -143,5 +145,5 @@ pulseos/
 12. **`ALTER TABLE ADD COLUMN` is not idempotent in SQLite** — it will fail if the column already exists. Wrap each ALTER TABLE in try/catch after the main `db.exec()` block. Never place bare ALTER TABLE inside the shared exec call.
 13. **Accept-invite pages use vanilla JS** — `accept-invite.astro` follows the `status.astro` pattern: self-contained HTML + inline `<script type="module">`, no React. Target user is not yet authenticated when visiting this page.
 14. **Webhook secrets are auto-generated** — `createWebhook()` in `routes/apikeys.ts` generates a 24-char secret via `crypto.randomUUID()`. The secret is returned once at creation and stored in the `webhooks` table. No HMAC signature generation is performed on outgoing webhook payloads.
-15. **Two `.env` files, different scopes**: Root `.env` is for backend (`process.env` via `import 'dotenv/config'`). `apps/web/.env` is for frontend (`PUBLIC_API_URL` via Astro/Vite `define`). They do NOT share variables. Backend env vars go in root `.env`; frontend `PUBLIC_*` vars go in `apps/web/.env`.
+15. **Two `.env` files, different scopes**: Root `.env` is for backend (`process.env` via `import 'dotenv/config'`). `apps/web/.env` is for frontend (`PUBLIC_API_URL` via Astro/Vite `loadEnv` in `astro.config.mjs`). They do NOT share variables. Backend env vars go in root `.env`; frontend `PUBLIC_*` vars go in `apps/web/.env`. Notification config (Telegram/Discord) and status page title can also be set via Dashboard → Settings (saved to DB, takes priority over `.env`).
 16. **Error pages use shared components**: `ErrorBoundary` wraps the root `<App />` to catch React crashes. `ErrorState` provides 5 typed error views (404, 500, offline, crash, generic). Always use `ErrorState` for error display — never inline error UI.

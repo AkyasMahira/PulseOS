@@ -26,6 +26,7 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Team Routes** | `routes/team.ts` | User CRUD (owner-gated), invite generation/revocation (admin-gated), accept-invite (no auth) |
 | **Server Routes** | `routes/servers.ts` | Remote server CRUD (admin-gated), `apiToken` stripped from all responses, polling loop via `startRemotePolling()` |
 | **API Key Routes** | `routes/apikeys.ts` | API key CRUD (one-time reveal), webhook CRUD. All admin-gated. |
+| **Settings Routes** | `routes/settings.ts` | Key-value config storage (DB-backed). GET/PUT for notification tokens, status page title/desc. |
 
 > 📋 **Planned (Phase 4)**: `routes/billing.ts`
 
@@ -46,6 +47,7 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Servers** | `servers/ServersPage.tsx` | Remote server cards with CPU/RAM/Disk, add/remove, online status |
 | **Team** | `servers/TeamPage.tsx` | User list with role management, invite creation + link sharing |
 | **API Keys** | `saas/ApiKeysPage.tsx` | Key creation (one-time reveal), webhook management |
+| **Profile** | `servers/ProfilePage.tsx` | JWT token display (for multi-server), password change, account info |
 
 > 📋 **Planned (Phase 4)**: `saas/BillingPage.tsx`
 

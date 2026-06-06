@@ -122,12 +122,25 @@
 - V1-08: Mobile sidebar — hamburger drawer with auto-close on nav click
 - Error pages — `ErrorBoundary` (React crash recovery) + `ErrorState` (404/500/offline/crash states)
 
+## Polish Sprint ✅ Complete
+
+**User experience improvements:**
+- Profile page — JWT token display + copy (for multi-server config), password change form
+- Alert rules — enable/disable toggle, delete button per rule (PUT/DELETE endpoints added)
+- Invite list — copy button per invite, expired badge, "Xh remaining" countdown
+- Docker containers — delete button (Trash2 icon with confirm dialog)
+- Settings page — editable notification form (Telegram, Discord) + status page title/desc, saved to DB
+- Add Server — helper text explaining how to get JWT token from DevTools
+- Notification settings wired to backend — `getSetting()` reads DB before falling back to `.env`
+
 ## Bug Fixes
 
 | Fix | Description | File | Date |
 |---|---|---|---|
 | ALTER TABLE idempotency | Bare `ALTER TABLE ADD COLUMN` in `migrate()` caused `SqliteError: duplicate column name` on second boot. Fixed by wrapping each statement in try/catch after the main `db.exec()` block. | `db/index.ts:121-128` | — |
 | Stale env reference | SettingsPage referenced deleted `apps/api/.env`. Updated to `.env` (root directory). | `SettingsPage.tsx:76` | — |
+| DB settings not read | `settings` table was written by UI form but never read by backend. `alerts.ts` and `status.ts` now call `getSetting()` first, falling back to `process.env`. | `alerts.ts:15-17`, `status.ts:49-50` | — |
+| Astro env not loading on VPS | Vite `process.env.PUBLIC_API_URL` sometimes failed to read `apps/web/.env` in npm workspaces context. Fixed by using Vite's `loadEnv()` in `astro.config.mjs` to explicitly read from `apps/web/` directory. | `astro.config.mjs:2-4` | — |
 
 ## Refactored Config
 
@@ -153,15 +166,15 @@
 
 ## Refactored Components
 
-**DB module** — 9 tables: `metrics_history`, `disk_history`, `alert_rules`, `alert_events`, `users` (with `role`, `email`, `last_login_at`), `invites`, `servers`, `api_keys`, `webhooks`. ~366 lines with 30+ exported query functions. All Phase 3 table schemas created in a single `migrate()` execution.
+**DB module** — 10 tables: `metrics_history`, `disk_history`, `alert_rules`, `alert_events`, `users`, `invites`, `servers`, `api_keys`, `webhooks`, `settings`. ~440 lines with 40+ exported query functions.
 
-**Auth routes** — Provides login, first-run setup, `/me`. JWT payload: `{ sub, username, role }`. `updateLastLogin()` called on login. First-run setup and admin seed always create `owner` role.
+**Auth routes** — Provides login, first-run setup, `/me`, password change (`PUT /api/auth/password`), and JWT token display (`GET /api/auth/token`).
 
 **Auth middleware** — Four exported async functions: `requireAuth` (any valid JWT), `requireAdmin` (owner or admin), `requireOwner` (owner only), `requireApiKey` (validates `x-api-key` header against `api_keys` table). All properly return after `reply.send()`.
 
-**Sidebar** — 10 nav items with role-based filtering. `requireRole` arrays on `servers`, `team`, `apikeys` hide items from viewers. Role badge reads from `useAuthStore().role` via `ROLE_LABELS` map.
+**Sidebar** — 11 nav items with role-based filtering. `requireRole` arrays on `servers`, `team`, `apikeys` hide items from viewers. Profile page accessible to all.
 
-**Dashboard** — Page router with 10 pages. All Phase 3 pages (servers, team, apikeys) have full implementations.
+**Dashboard** — Page router with 11 pages. Invalid PageId renders 404 ErrorState.
 
 **Docker routes** — Container mutations (start/stop/restart/remove) gated behind `requireAdmin`. Listing and logs remain viewer-accessible.
 

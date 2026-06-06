@@ -58,11 +58,11 @@
 |---|---|---|---|---|
 | P-01 | Email alerts channel | M | `alerts.ts` | `AlertChannel.email` defined but not implemented |
 | P-02 | Dark/light theme toggle | S | `tailwind.config.mjs` | Currently dark-only |
-| P-03 | Password reset flow | L | — | Forgot-password, reset tokens, email dispatch |
+| P-03 | Password reset flow | L | — | Forgot-password via email. Password CHANGE (logged-in) is implemented via Profile page. |
 | P-04 | SSO / SAML | L | — | Enterprise plan feature |
 | P-05 | Metrics export (CSV/JSON) | S | `routes/metrics.ts` | GET `/api/metrics/export` |
 | P-06 | Alert test/preview button | S | `routes/metrics.ts` | POST `/api/alerts/rules/:id/test` |
-| P-07 | Mobile sidebar (drawer) | S | `Dashboard.tsx`, `Sidebar.tsx` | `mobileMenuOpen` state exists but Sidebar hidden below `lg`
+| P-07 | Mobile sidebar (drawer) | S | `Dashboard.tsx`, `Sidebar.tsx` | ✅ Done — hamburger toggle with auto-close |
 
 ---
 
