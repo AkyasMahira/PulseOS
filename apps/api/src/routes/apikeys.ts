@@ -1,10 +1,15 @@
 import type { FastifyInstance } from 'fastify'
+import crypto from 'crypto'
 import { requireAdmin } from '../middleware/auth.js'
 import type { ApiKeyScope } from '@pulseos/types'
 import {
   createApiKey, listApiKeys, revokeApiKey,
   createWebhook, listWebhooks, deleteWebhook,
 } from '../db/index.js'
+
+function sha256(data: string): string {
+  return crypto.createHash('sha256').update(data).digest('hex')
+}
 
 export async function apiKeysRoutes(app: FastifyInstance) {
   // ── API Keys ─────────────────────────────────────────────────────────────
@@ -17,7 +22,18 @@ export async function apiKeysRoutes(app: FastifyInstance) {
   // POST /api/apikeys
   app.post<{ Body: { prefix?: string; scope?: ApiKeyScope } }>(
     '/',
-    { preHandler: requireAdmin },
+    {
+      preHandler: requireAdmin,
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            prefix: { type: 'string', maxLength: 10 },
+            scope: { type: 'string', enum: ['read', 'write', 'admin'] },
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const jwtUser = (req as any).user
       const prefix = req.body.prefix?.slice(0, 10) ?? 'pk_'
@@ -30,7 +46,7 @@ export async function apiKeysRoutes(app: FastifyInstance) {
       const keyHex = crypto.randomUUID().replace(/-/g, '')
       const fullKey = `${prefix}${keyHex}`
 
-      const created = createApiKey(prefix, fullKey, scope, jwtUser.sub)
+      const created = createApiKey(prefix, sha256(fullKey), scope, jwtUser.sub)
 
       return {
         ok: true,
@@ -63,7 +79,20 @@ export async function apiKeysRoutes(app: FastifyInstance) {
   // POST /api/apikeys/webhooks
   app.post<{ Body: { url: string; events: string[]; secret?: string } }>(
     '/webhooks',
-    { preHandler: requireAdmin },
+    {
+      preHandler: requireAdmin,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['url', 'events'],
+          properties: {
+            url: { type: 'string', minLength: 1, maxLength: 512 },
+            events: { type: 'array', minItems: 1, items: { type: 'string' } },
+            secret: { type: 'string', maxLength: 128 },
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const { url, events, secret } = req.body
 

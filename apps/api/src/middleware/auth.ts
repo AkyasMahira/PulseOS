@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
+import crypto from 'crypto'
 import type { UserRole } from '@pulseos/types'
 import { getApiKeyByHash, touchApiKey } from '../db/index.js'
 
@@ -52,7 +53,8 @@ export async function requireApiKey(req: FastifyRequest, reply: FastifyReply) {
     return
   }
 
-  const record = getApiKeyByHash(key)
+  const hash = crypto.createHash('sha256').update(key).digest('hex')
+  const record = getApiKeyByHash(hash)
   if (!record) {
     reply.code(401).send({ ok: false, error: 'invalid api key' })
     return

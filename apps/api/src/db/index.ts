@@ -123,6 +123,7 @@ function migrate(db: Database.Database) {
     "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'",
     "ALTER TABLE users ADD COLUMN email TEXT",
     "ALTER TABLE users ADD COLUMN last_login_at INTEGER",
+    "ALTER TABLE alert_rules ADD COLUMN last_fired_at INTEGER",
   ]) {
     try { db.exec(stmt) } catch {}
   }
@@ -137,6 +138,13 @@ export function insertMetric(
     INSERT INTO metrics_history (ts, cpu, mem_used, mem_total, net_rx, net_tx)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(ts, cpu, memUsed, memTotal, netRx, netTx)
+}
+
+export function insertDiskHistory(ts: number, mountpoint: string, used: number, total: number) {
+  getDb().prepare(`
+    INSERT INTO disk_history (ts, mountpoint, used, total)
+    VALUES (?, ?, ?, ?)
+  `).run(ts, mountpoint, used, total)
 }
 
 export function getMetricsHistory(
@@ -187,6 +195,21 @@ export function insertAlertEvent(e: AlertEvent) {
     INSERT INTO alert_events (id, rule_id, rule_name, severity, message, value, threshold, fired_at, resolved_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(e.id, e.ruleId, e.ruleName, e.severity, e.message, e.value, e.threshold, e.firedAt, e.resolvedAt ?? null)
+}
+
+export function resolveAlertsForRule(ruleId: string) {
+  getDb().prepare(
+    'UPDATE alert_events SET resolved_at = ? WHERE rule_id = ? AND resolved_at IS NULL'
+  ).run(Date.now(), ruleId)
+}
+
+export function updateAlertLastFired(ruleId: string, timestamp: number) {
+  getDb().prepare('UPDATE alert_rules SET last_fired_at = ? WHERE id = ?').run(timestamp, ruleId)
+}
+
+export function loadAlertCooldowns(): Map<string, number> {
+  const rows = getDb().prepare('SELECT id, last_fired_at FROM alert_rules WHERE last_fired_at IS NOT NULL').all() as any[]
+  return new Map(rows.map(r => [r.id, r.last_fired_at] as [string, number]))
 }
 
 export function getRecentAlerts(limit = 50): AlertEvent[] {
