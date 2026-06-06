@@ -136,6 +136,7 @@ export function AlertsPage() {
   const [rules, setRules] = useState<AlertRule[]>([])
   const [showForm, setShowForm] = useState(false)
   const [tab, setTab] = useState<'events' | 'rules'>('events')
+  const [editingRule, setEditingRule] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/api/alerts/rules`, { headers: { Authorization: `Bearer ${token}` } })
@@ -150,10 +151,32 @@ export function AlertsPage() {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(rule),
     })
+    fetchRules()
+    setShowForm(false)
+  }
+
+  const fetchRules = async () => {
     const res = await fetch(`${API_URL}/api/alerts/rules`, { headers: { Authorization: `Bearer ${token}` } })
     const data = await res.json()
     setRules(data.data ?? [])
-    setShowForm(false)
+  }
+
+  const updateRule = async (id: string, updates: Partial<AlertRule>) => {
+    await fetch(`${API_URL}/api/alerts/rules/${id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    fetchRules()
+  }
+
+  const deleteRule = async (id: string) => {
+    if (!confirm('Delete this alert rule?')) return
+    await fetch(`${API_URL}/api/alerts/rules/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    fetchRules()
   }
 
   const seedDefaults = async () => {
@@ -223,7 +246,12 @@ export function AlertsPage() {
                   {rule.channels.length > 0 && ` · ${rule.channels.join(', ')}`}
                 </div>
               </div>
-              <div className={`w-1.5 h-1.5 rounded-full ${rule.enabled ? 'bg-accent-green' : 'bg-slate-600'}`} />
+              <button onClick={() => updateRule(rule.id, { enabled: !rule.enabled })}
+                className={`w-1.5 h-1.5 rounded-full cursor-pointer ${rule.enabled ? 'bg-accent-green' : 'bg-slate-600'}`} title="Toggle enable" />
+              <button onClick={() => deleteRule(rule.id)}
+                className="text-slate-600 hover:text-red-400 transition-colors" title="Delete rule">
+                <Trash2 size={13} />
+              </button>
             </div>
           ))}
         </div>

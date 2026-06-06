@@ -11,6 +11,7 @@ import { statusRoutes } from './routes/status.js'
 import { teamRoutes } from './routes/team.js'
 import { serversRoutes, startRemotePolling } from './routes/servers.js'
 import { apiKeysRoutes } from './routes/apikeys.js'
+import { settingsRoutes } from './routes/settings.js'
 import { createSocketServer } from './ws/hub.js'
 import { getDb, insertUser, userCount } from './db/index.js'
 import bcrypt from 'bcryptjs'
@@ -65,6 +66,7 @@ async function bootstrap() {
   await app.register(teamRoutes, { prefix: '/api/team' })
   await app.register(serversRoutes, { prefix: '/api/servers' })
   await app.register(apiKeysRoutes, { prefix: '/api/apikeys' })
+  await app.register(settingsRoutes, { prefix: '/api/settings' })
 
   // Health check
   app.get('/health', async () => ({ ok: true, ts: Date.now() }))

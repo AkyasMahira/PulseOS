@@ -16,6 +16,7 @@ import { ProcessesPage } from '../services/ProcessesPage'
 import { ServersPage } from '../servers/ServersPage'
 import { TeamPage } from '../servers/TeamPage'
 import { ApiKeysPage } from '../saas/ApiKeysPage'
+import { ProfilePage } from '../servers/ProfilePage'
 import { ErrorState } from '../shared/ErrorState'
 import { fmtBytes, fmtBytesPerSec, fmtUptime, fmtPct } from '../../lib/utils'
 import { Cpu, HardDrive, ArrowDownUp, Clock, Activity, MemoryStick, Bell } from 'lucide-react'
@@ -82,6 +83,7 @@ export function Dashboard() {
     overview: 'Overview', containers: 'Containers', processes: 'Processes',
     network: 'Network', alerts: 'Alerts', history: 'Metrics History', settings: 'Settings',
     servers: 'Servers', team: 'Team', apikeys: 'API Keys',
+    profile: 'Profile',
   }
 
   return (
@@ -128,6 +130,7 @@ export function Dashboard() {
           {currentPage === 'servers'    && <ServersPage />}
           {currentPage === 'team'       && <TeamPage />}
           {currentPage === 'apikeys'    && <ApiKeysPage />}
+          {currentPage === 'profile'    && <ProfilePage />}
         </div>
 
         {/* Footer */}
