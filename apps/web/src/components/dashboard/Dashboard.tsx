@@ -16,6 +16,7 @@ import { ProcessesPage } from '../services/ProcessesPage'
 import { ServersPage } from '../servers/ServersPage'
 import { TeamPage } from '../servers/TeamPage'
 import { ApiKeysPage } from '../saas/ApiKeysPage'
+import { ErrorState } from '../shared/ErrorState'
 import { fmtBytes, fmtBytesPerSec, fmtUptime, fmtPct } from '../../lib/utils'
 import { Cpu, HardDrive, ArrowDownUp, Clock, Activity, MemoryStick, Bell } from 'lucide-react'
 
@@ -92,7 +93,7 @@ export function Dashboard() {
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)}>
           <div className="absolute inset-0 bg-black/60" />
           <div className="absolute left-0 top-0 bottom-0 w-48 z-50" onClick={e => e.stopPropagation()}>
-            <Sidebar />
+            <Sidebar mobile onNavClick={() => setMobileMenuOpen(false)} />
           </div>
         </div>
       )}
@@ -112,6 +113,11 @@ export function Dashboard() {
 
         {/* Page content */}
         <div className="flex-1 overflow-y-auto">
+          {!PAGE_TITLES[currentPage] && (
+            <div className="p-4 animate-fade-in">
+              <ErrorState type="404" />
+            </div>
+          )}
           {currentPage === 'overview'   && <OverviewPage />}
           {currentPage === 'containers' && <ContainersPage />}
           {currentPage === 'processes'  && <ProcessesPage />}

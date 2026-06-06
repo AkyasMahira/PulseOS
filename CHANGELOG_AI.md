@@ -42,9 +42,9 @@
 - Notes: Via Unix socket `/var/run/docker.sock`. Calculates CPU% from cgroup stats. Container actions (start/stop/restart/pause/unpause). Log viewer modal with tail. Expand/collapse rows.
 
 **Alert Engine**
-- Status: ✅ Core implemented; alert resolution is partial
+- Status: ✅ Fully implemented (enhanced in V1-04, V1-06)
 - Files: `alerts.ts`, `routes/metrics.ts`, `components/alerts/AlertsPage.tsx`
-- Notes: Per-rule cooldown tracking in memory. Telegram + Discord dispatch. Alert events persisted to DB. Frontend shows events feed + rule CRUD. **Alert auto-resolution (marking resolvedAt) is NOT implemented** — alerts never auto-resolve.
+- Notes: Per-rule cooldown tracking persisted to `alert_rules.last_fired_at` (survives restart). Telegram + Discord + Webhook dispatch. Alert auto-resolution: `resolveAlertsForRule()` marks `resolvedAt` when rule stops firing on next tick. Frontend shows events feed + rule CRUD.
 
 **History Charts**
 - Status: ✅ Fully implemented
@@ -107,6 +107,21 @@
 
 ---
 
+## v1 Release Sprint ✅ Complete
+
+**7 critical fixes applied:**
+- V1-01: JWT secret — `process.exit(1)` in production if default
+- V1-02: Input validation — Fastify JSON schema on all POST routes (team, servers, apikeys)
+- V1-03: Removed 6 unused dependencies (`node-telegram-bot-api`, `@fastify/websocket`, `clsx`, `tailwind-merge`, `@radix-ui/*`)
+- V1-04: Alert auto-resolution — `resolveAlertsForRule()` resolves when rules stop firing
+- V1-05: Disk history writes — `insertDiskHistory()` called in WS tick loop
+- V1-06: Alert cooldown persistence — persisted to `alert_rules.last_fired_at`, survives restart
+- V1-07: API key hashing — sha256 before storage, sha256 comparison in `requireApiKey`
+
+**Additional features:**
+- V1-08: Mobile sidebar — hamburger drawer with auto-close on nav click
+- Error pages — `ErrorBoundary` (React crash recovery) + `ErrorState` (404/500/offline/crash states)
+
 ## Bug Fixes
 
 | Fix | Description | File | Date |
@@ -124,9 +139,6 @@
 
 | Feature | What Works | What's Missing | File |
 |---|---|---|---|
-| Alert resolution | Alerts fired and stored | `resolvedAt` never set — alerts never auto-resolve | `alerts.ts` |
-| Disk history | Table + index exist, pruning works | INSERT never called (data never written) | `db/index.ts`, `ws/hub.ts` |
-| `@fastify/websocket` dep | Listed in package.json | Not used — Socket.IO used instead | `package.json` |
 | Email alerts channel | Defined in `AlertChannel` type | No implementation in `alerts.ts` | `alerts.ts` |
 
 ## Planned Features 📋
@@ -165,7 +177,7 @@
 4. **JWT-only auth**: No session invalidation mechanism. Logout is client-side only (removes token from localStorage). Role changes require re-login (stale JWT role claim).
 5. **Single-tenant SQLite**: All users share one database. No data isolation between tenants (relevant for SaaS path).
 6. **No test suite**: Zero tests across entire codebase.
-7. **No input sanitization layer**: Route handlers validate presence but not format/content of inputs beyond Fastify's JSON schema on login.
-8. **ALTER TABLE idempotency**: ✅ Fixed — ALTER TABLE statements now wrapped in try/catch. Second boot no longer crashes.
-9. **API keys stored as plaintext**: `key_hash` column stores the raw key, not a hash. `requireApiKey` compares directly. No cryptographic hashing.
+7. **Input validation**: ✅ Fixed (V1-02) — Fastify JSON schema on all POST routes.
+8. **ALTER TABLE idempotency**: ✅ Fixed — ALTER TABLE statements now wrapped in try/catch.
+9. **API key hashing**: ✅ Fixed (V1-07) — keys hashed with sha256 before storage.
 10. **Webhook secrets auto-generated**: `createWebhook()` generates a 24-char secret but no HMAC signature is computed on outgoing payloads. The `X-Webhook-Secret` header is sent for consumer-side verification only.

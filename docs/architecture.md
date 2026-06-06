@@ -76,6 +76,9 @@ pulseos/                          # Monorepo root
 │       │       │   └── TeamPage.tsx     # User management + invites
 │       │       ├── saas/
 │       │       │   └── ApiKeysPage.tsx  # API key + webhook management
+│       │       ├── shared/
+│       │       │   ├── ErrorBoundary.tsx  # React crash recovery
+│       │       │   └── ErrorState.tsx     # 404, 500, offline, crash states
 │           ├── hooks/useSocket.ts    # Socket.IO connection + store wiring
 │           ├── stores/metrics.ts     # Zustand — all live state
 │           └── lib/utils.ts         # fmtBytes, fmtUptime, fmtPct, etc.
@@ -177,8 +180,8 @@ Client POST /api/docker/:id/restart
 
 ```sql
 metrics_history  (id, ts, cpu, mem_used, mem_total, net_rx, net_tx)
-disk_history     (id, ts, mountpoint, used, total)    ← created but never written
-alert_rules      (id, name, metric, condition, threshold, severity, channels, cooldown, enabled, created_at)
+disk_history     (id, ts, mountpoint, used, total)
+alert_rules      (id, name, metric, condition, threshold, severity, channels, cooldown, enabled, created_at, last_fired_at)
 alert_events     (id, rule_id, rule_name, severity, message, value, threshold, fired_at, resolved_at)
 users            (id, username, password, role, email, last_login_at, created_at)
 -- role, email, last_login_at added via ALTER TABLE with try/catch guard

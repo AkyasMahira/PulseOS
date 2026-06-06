@@ -16,10 +16,9 @@
 - **Fix Required**: When implementing, use `stripe` npm package with `webhooks.constructEvent()` and register `@fastify/rawbody` plugin.
 
 ### C-02 — API Keys Stored as Plaintext
-- **Status**: ❌ Not Fixed — keys are still stored as plaintext
-- **Risk**: `createApiKey()` in `routes/apikeys.ts` stores the raw key in `key_hash` column. `requireApiKey` middleware compares the `x-api-key` header directly against the stored value.
-- **File**: `apps/api/src/db/index.ts:314-322`, `apps/api/src/middleware/auth.ts:52-53`
-- **Fix Required**: Hash the key with `sha256(key)` before storing in `key_hash`. Update `requireApiKey` to compare `sha256(x-api-key)` against the stored hash.
+- **Status**: ✅ Fixed (V1-07)
+- **File**: `apps/api/src/routes/apikeys.ts:14` (sha256 hash on creation), `apps/api/src/middleware/auth.ts:52-53` (sha256 compare on auth)
+- **Evidence**: `createApiKey(prefix, sha256(fullKey), scope, ...)` stores hash. `requireApiKey` computes `sha256(x-api-key)` before lookup.
 
 ### C-03 — API Keys Not Used for Authentication
 - **Status**: ✅ Fixed
@@ -30,10 +29,9 @@
 ---
 
 ### C-04 — Default JWT Secret in Production
-- **Status**: Partially Fixed (warning added, no hard enforcement)
-- **Risk**: If `JWT_SECRET` env var is not set, the application starts with `'dev-secret-change-me'` as the JWT signing key. Any attacker who knows this can forge valid JWTs for any user including owners.
-- **File**: `apps/api/src/index.ts`
-- **Fix Applied**: Phase 3A added console.warn on startup if JWT_SECRET is default. Recommended: `process.exit(1)` in production if not set.
+- **Status**: ✅ Fixed (V1-01)
+- **File**: `apps/api/src/index.ts:19-23`
+- **Evidence**: `process.exit(1)` if `JWT_SECRET === 'dev-secret-change-me'` and `NODE_ENV === 'production'`. Development still warns but doesn't crash.
 
 ---
 
@@ -42,10 +40,9 @@
 ---
 
 ### H-01 — Alert Auto-Resolution Not Implemented
-- **Status**: Pending
-- **Risk**: Functional — alerts fire but `resolvedAt` is never set. The status page `uptime7d` calculation (`SUM(COALESCE(resolved_at, ?) - fired_at)`) will calculate infinite downtime duration for unresolved alerts.
-- **File**: `apps/api/src/alerts.ts`
-- **Fix Required**: In `tick()` or `evaluateAlerts()`, track which rule IDs are currently firing. When a rule no longer triggers, UPDATE `alert_events SET resolved_at = ? WHERE rule_id = ? AND resolved_at IS NULL`.
+- **Status**: ✅ Fixed (V1-04)
+- **File**: `apps/api/src/alerts.ts:107-131`
+- **Evidence**: `evaluateAlerts()` tracks `activeRules` Set. When a previously-firing rule stops triggering, calls `resolveAlertsForRule(ruleId)` which updates `alert_events.resolved_at`.
 
 ### H-02 — Webhook Delivery Never Triggered
 - **Status**: ✅ Fixed
@@ -65,10 +62,9 @@
 - **Evidence**: `requireAuth`, `requireAdmin`, and `requireOwner` all have `return` after each `reply.send()` call. Async flow no longer continues after error responses.
 
 ### H-05 — Disk History Table Never Written
-- **Status**: Pending
-- **Risk**: Data integrity — `disk_history` table exists with proper schema and indexes, and is pruned, but is never populated. Historical disk usage charts are silently missing data.
-- **Files**: `db/index.ts` (table created, pruned), `ws/hub.ts` (only calls `insertMetric`, no disk insert)
-- **Fix Required**: Add `insertDiskHistory()` function in `db/index.ts` and call it in `ws/hub.ts:tick()` for each disk in `snapshot.disks`.
+- **Status**: ✅ Fixed (V1-05)
+- **File**: `apps/api/src/db/index.ts:141-146` (insertDiskHistory), `apps/api/src/ws/hub.ts:86-88` (called in tick)
+- **Evidence**: `insertDiskHistory(ts, mountpoint, used, total)` called in `tick()` for each disk in `snapshot.disks`. Data now flows into `disk_history` table.
 
 ### H-06 — Remote Server API Tokens (Security Issue)
 - **Status**: ✅ Fixed
@@ -83,10 +79,9 @@
 ---
 
 ### M-01 — No Input Validation Beyond Presence Checks
-- **Status**: Pending
-- **Files**: `routes/docker.ts`, `routes/metrics.ts`
-- **Risk**: Stored XSS via long strings, etc.
-- **Fix Required**: Add Fastify JSON schema validation to all POST routes (like the login route already has).
+- **Status**: ✅ Fixed (V1-02)
+- **Files**: `routes/team.ts`, `routes/servers.ts`, `routes/apikeys.ts`
+- **Evidence**: Fastify JSON `schema.body` added to all 6 POST routes (team users/role, invites, accept-invite, servers, apikeys, webhooks). Includes type, required, minLength, maxLength, enum, format validations.
 
 ### M-02 — Sidebar Role Label Is Hardcoded
 - **Status**: ✅ Fixed
@@ -98,16 +93,14 @@
 - **Risk**: SPA with JWT in localStorage is not vulnerable to classic CSRF, but cookie-based sessions (if ever added) would be. Rate limiting partially mitigates.
 
 ### M-04 — `node-telegram-bot-api` Listed as Dependency But Unused
-- **Status**: Pending
+- **Status**: ✅ Fixed (V1-03)
 - **File**: `apps/api/package.json`
-- **Risk**: Supply chain attack surface. Unused dependency.
-- **Fix Required**: Remove from `package.json`. Alerts use direct `fetch()` to Telegram API.
+- **Evidence**: Removed from dependencies. Alerts use direct `fetch()` to Telegram API.
 
 ### M-05 — In-Memory Alert Cooldown State Lost on Restart
-- **Status**: Pending (by design for MVP, but needs documentation)
-- **File**: `apps/api/src/alerts.ts:4` (`const lastFired = new Map<string, number>()`)
-- **Risk**: After API restart, all alert cooldowns reset. A flapping service could spam notifications immediately after restart.
-- **Fix Required**: Persist `lastFired` timestamps to SQLite (add `last_fired_at` column to `alert_rules`).
+- **Status**: ✅ Fixed (V1-06)
+- **File**: `apps/api/src/alerts.ts:4`, `apps/api/src/db/index.ts:205-213`
+- **Evidence**: Cooldowns persisted to `alert_rules.last_fired_at`. `loadAlertCooldowns()` loads from DB on startup. `updateAlertLastFired()` persists after each fire. Survives restart.
 
 ### M-06 — No Request Body Size Limit
 - **Status**: ✅ Fixed
@@ -115,10 +108,9 @@
 - **Evidence**: Fastify configured with `bodyLimit: 1_048_576` (1MB).
 
 ### M-07 — `@fastify/websocket` Listed But Unused
-- **Status**: Pending
+- **Status**: ✅ Fixed (V1-03)
 - **File**: `apps/api/package.json`
-- **Risk**: Unused dependency, potential confusion.
-- **Fix Required**: Remove — Socket.IO handles WebSocket transport directly.
+- **Evidence**: Removed from dependencies. Socket.IO handles WebSocket transport directly.
 
 ### M-08 — No Logging / Audit Trail for Destructive Actions
 - **Status**: Pending
@@ -147,16 +139,14 @@
 - **Fix**: Import in `ws/hub.ts` to type Socket.IO emit calls.
 
 ### L-04 — `clsx` and `tailwind-merge` Listed as Dependencies But Unused
-- **Status**: Pending
+- **Status**: ✅ Fixed (V1-03)
 - **File**: `apps/web/package.json`
-- **Evidence**: No `import { clsx }` or `import { twMerge }` found in web source. `lib/utils.ts` has a custom `cn()` function that does simple string join.
-- **Fix**: Remove from `package.json`, or use them in `cn()` for proper Tailwind class merging.
+- **Evidence**: Removed from dependencies.
 
 ### L-05 — `@radix-ui` Packages Listed But Unused
-- **Status**: Pending
+- **Status**: ✅ Fixed (V1-03)
 - **File**: `apps/web/package.json`
-- **Evidence**: No imports of `@radix-ui` found in source.
-- **Fix**: Remove unused dependencies.
+- **Evidence**: Removed from dependencies.
 
 ### L-06 — Process CPU Calculation on First Tick Is Zero
 - **Status**: Pending (known limitation)

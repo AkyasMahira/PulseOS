@@ -1,7 +1,8 @@
 import type { SystemSnapshot, ServiceStatus, AlertRule, AlertEvent } from '@pulseos/types'
-import { getAlertRules, insertAlertEvent, listWebhooks } from './db/index.js'
+import { getAlertRules, insertAlertEvent, listWebhooks, resolveAlertsForRule, updateAlertLastFired, loadAlertCooldowns } from './db/index.js'
 
-const lastFired = new Map<string, number>()
+const lastFired = loadAlertCooldowns()
+const activeRules = new Set<string>()
 
 function checkCondition(value: number, condition: string, threshold: number): boolean {
   if (condition === 'gt') return value > threshold
@@ -54,6 +55,8 @@ async function fireAlert(rule: AlertRule, value: number, message: string) {
 
   if (now - last < rule.cooldownSecs * 1000) return
   lastFired.set(rule.id, now)
+  updateAlertLastFired(rule.id, now)
+  activeRules.add(rule.id)
 
   const event: AlertEvent = {
     id: crypto.randomUUID(),
@@ -114,11 +117,14 @@ export async function evaluateAlerts(snapshot: SystemSnapshot, services: Service
     net: snapshot.net.reduce((a, n) => a + n.rxBytes + n.txBytes, 0),
   }
 
+  const firedThisTick = new Set<string>()
+
   for (const rule of rules) {
     if (rule.metric === 'service') {
       const down = services.filter(s => s.status === 'offline')
       if (down.length > 0) {
         await fireAlert(rule, down.length, `${down.length} service(s) down: ${down.map(s => s.name).join(', ')}`)
+        firedThisTick.add(rule.id)
       }
       continue
     }
@@ -126,6 +132,14 @@ export async function evaluateAlerts(snapshot: SystemSnapshot, services: Service
     const value = values[rule.metric]
     if (value !== undefined && checkCondition(value, rule.condition, rule.threshold)) {
       await fireAlert(rule, value, `${rule.metric.toUpperCase()} is ${value}% (threshold: ${rule.condition} ${rule.threshold}%)`)
+      firedThisTick.add(rule.id)
+    }
+  }
+
+  for (const ruleId of activeRules) {
+    if (!firedThisTick.has(ruleId)) {
+      resolveAlertsForRule(ruleId)
+      activeRules.delete(ruleId)
     }
   }
 }

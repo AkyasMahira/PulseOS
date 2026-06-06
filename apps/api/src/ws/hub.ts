@@ -2,7 +2,7 @@ import { Server as SocketServer } from "socket.io";
 import type { Server as HttpServer } from "http";
 import jwt from "jsonwebtoken";
 import { collectAll } from "../collectors/index.js";
-import { insertMetric, pruneOldMetrics } from "../db/index.js";
+import { insertMetric, pruneOldMetrics, insertDiskHistory } from "../db/index.js";
 import { evaluateAlerts, onAlert } from "../alerts.js";
 import type { AlertEvent } from "@pulseos/types";
 
@@ -81,6 +81,10 @@ async function tick() {
       netRx,
       netTx,
     );
+
+    for (const disk of snapshot.disks) {
+      insertDiskHistory(snapshot.timestamp, disk.mountpoint, disk.used, disk.total)
+    }
 
     await evaluateAlerts(snapshot, services);
 

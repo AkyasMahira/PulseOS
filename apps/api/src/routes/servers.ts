@@ -64,7 +64,22 @@ export async function serversRoutes(app: FastifyInstance) {
   // POST /api/servers
   app.post<{ Body: { name: string; host: string; apiUrl: string; apiToken: string; tags?: string[] } }>(
     '/',
-    { preHandler: requireAdmin },
+    {
+      preHandler: requireAdmin,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['name', 'host', 'apiUrl', 'apiToken'],
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 128 },
+            host: { type: 'string', minLength: 1, maxLength: 255 },
+            apiUrl: { type: 'string', minLength: 1, maxLength: 512 },
+            apiToken: { type: 'string', minLength: 1, maxLength: 1024 },
+            tags: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const { name, host, apiUrl, apiToken, tags } = req.body
       if (!name || !host || !apiUrl || !apiToken) {

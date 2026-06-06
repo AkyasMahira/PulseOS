@@ -19,7 +19,16 @@ export async function teamRoutes(app: FastifyInstance) {
   // PUT /api/team/users/:id/role
   app.put<{ Params: { id: string }; Body: { role: UserRole } }>(
     '/users/:id/role',
-    { preHandler: requireOwner },
+    {
+      preHandler: requireOwner,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['role'],
+          properties: { role: { type: 'string', enum: ['owner', 'admin', 'viewer'] } },
+        },
+      },
+    },
     async (req, reply) => {
       const id = parseInt(req.params.id)
       const { role } = req.body
@@ -69,7 +78,19 @@ export async function teamRoutes(app: FastifyInstance) {
   // POST /api/team/invites
   app.post<{ Body: { email: string; role: UserRole } }>(
     '/invites',
-    { preHandler: requireAdmin },
+    {
+      preHandler: requireAdmin,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email', 'role'],
+          properties: {
+            email: { type: 'string', format: 'email', maxLength: 255 },
+            role: { type: 'string', enum: ['viewer', 'admin'] },
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const { email, role } = req.body
 
@@ -134,6 +155,19 @@ export async function teamRoutes(app: FastifyInstance) {
 
   app.post<{ Body: { token: string; username: string; password: string } }>(
     '/accept-invite',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['token', 'username', 'password'],
+          properties: {
+            token: { type: 'string', minLength: 1 },
+            username: { type: 'string', minLength: 1, maxLength: 64 },
+            password: { type: 'string', minLength: 8, maxLength: 128 },
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const { token, username, password } = req.body
 

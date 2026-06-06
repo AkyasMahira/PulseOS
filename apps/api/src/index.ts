@@ -21,6 +21,10 @@ const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me'
 
 if (JWT_SECRET === 'dev-secret-change-me') {
   console.warn('[pulseos] WARNING: Using default JWT secret. Set JWT_SECRET env var for production.')
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[pulseos] FATAL: JWT_SECRET is default. Refusing to start in production.')
+    process.exit(1)
+  }
 }
 
 async function bootstrap() {

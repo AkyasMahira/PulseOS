@@ -88,10 +88,10 @@
 - Net (`net`) is defined in the type but has no `values` mapping in `evaluateAlerts()`.
 
 ### BR-ALERT-02 — Cooldown Enforcement
-- **Status**: Implemented (in-memory only — lost on restart)
+- **Status**: ✅ Implemented (persisted in V1-06)
 - Each rule has a `cooldownSecs` value. After an alert fires, the same rule cannot fire again until the cooldown expires.
-- Cooldown state is stored in a `Map<ruleId, lastFiredTimestamp>` in process memory.
-- On API restart, all cooldowns reset to zero.
+- Cooldown state persisted to `alert_rules.last_fired_at` column. Loaded on startup via `loadAlertCooldowns()`.
+- On API restart, cooldowns are preserved — no notification spam on reboot.
 
 ### BR-ALERT-03 — Alert Channels
 - **Status**: ✅ Implemented (enhanced in Phase 3D)
@@ -102,11 +102,11 @@
 - Channels are stored as a JSON array per rule. Webhooks use the separate `webhooks` table.
 
 ### BR-ALERT-04 — Alert Resolution
-- **Status**: Not Implemented
-- Alert events are inserted when thresholds are crossed.
-- `resolved_at` field exists in schema but is never set by the system.
-- Alerts must be manually resolved (no current UI mechanism for this either).
-- This causes incorrect uptime calculations on the public status page.
+- **Status**: ✅ Implemented (V1-04)
+- `evaluateAlerts()` tracks active rule IDs in an `activeRules` Set.
+- On each tick: rules that fire are added to `activeRules`. Rules that were active but no longer trigger have their `resolved_at` set via `resolveAlertsForRule()`.
+- Resolution is automatic — no manual intervention required.
+- Public status page uptime calculation now reflects resolved alerts correctly.
 
 ### BR-ALERT-05 — Alert Rule Scoping
 - **Status**: Not Implemented
@@ -191,20 +191,21 @@
 - Key can be revoked via `DELETE /api/apikeys/:id`.
 
 ### BR-APIKEY-02 — Key Authentication
-- **Status**: ✅ Implemented
+- **Status**: ✅ Implemented (enhanced in V1-07)
 - `requireApiKey` middleware in `middleware/auth.ts` checks `x-api-key` header.
-- Calls `getApiKeyByHash()` to validate key, `touchApiKey()` to update `last_used_at`.
-- ⚠️ Keys stored as plaintext in `key_hash` column — no cryptographic hashing.
+- Incoming key hashed with sha256 before comparing against stored `key_hash`.
+- `touchApiKey()` updates `last_used_at` on successful auth.
+- ✅ Keys stored as sha256 hash — not plaintext.
 
 ---
 
 ## 9. Metrics Retention Rules
 
 ### BR-METRICS-01 — Retention Policy
-- **Status**: Implemented
+- **Status**: ✅ Implemented (enhanced in V1-05)
 - Default retention: 30 days (configurable via `HISTORY_RETENTION_DAYS`).
 - Pruning runs once per day via `setInterval(pruneOldMetrics, 86_400_000)` in `ws/hub.ts`.
-- Both `metrics_history` and `disk_history` are pruned (though `disk_history` is never written).
+- Both `metrics_history` and `disk_history` are written and pruned.
 - Plan-based retention limits (7/30/90/365 days) are defined but not enforced at prune time.
 
 ### BR-METRICS-02 — Collection Frequency

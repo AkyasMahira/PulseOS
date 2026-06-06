@@ -25,7 +25,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   viewer: 'viewer',
 }
 
-export function Sidebar() {
+export function Sidebar({ onNavClick, mobile }: { onNavClick?: () => void; mobile?: boolean }) {
   const { currentPage, setPage, alerts, services } = useMetricsStore()
   const { username, role, clearAuth } = useAuthStore()
 
@@ -43,7 +43,7 @@ export function Sidebar() {
   })
 
   return (
-    <nav className="hidden lg:flex flex-col w-48 bg-surface-1 border-r border-surface-border flex-shrink-0">
+    <nav className={`flex flex-col w-48 bg-surface-1 border-r border-surface-border flex-shrink-0 h-full ${mobile ? '' : 'hidden lg:flex'}`}>
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
         <div className="w-1.5 h-1.5 rounded-full bg-accent-green shadow-[0_0_5px_#22c55e88] animate-pulse-slow" />
@@ -68,7 +68,7 @@ export function Sidebar() {
                 </div>
               )}
               <button
-                onClick={() => setPage(item.id)}
+                onClick={() => { setPage(item.id); onNavClick?.() }}
                 className={`w-full flex items-center gap-2.5 px-4 py-2 text-xs transition-all border-l-2 font-mono ${
                   isActive
                     ? 'text-slate-100 border-accent-blue bg-accent-blue/5'
