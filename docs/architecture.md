@@ -29,7 +29,7 @@ pulseos/                          # Monorepo root
 │   │       │   ├── services.ts   # systemctl + pm2 jlist → service status
 │   │       │   └── processes.ts  # /proc/{pid}/* → top processes by CPU
 │   │       ├── db/
-│   │       │   └── index.ts      # SQLite singleton, migrate(), all query functions
+│   │       │   └── index.ts      # SQLite singleton (sync mkdir guard), migrate(), all query functions
 │   │       └── middleware/
 │   │           └── auth.ts       # requireAuth, requireAdmin, requireOwner, requireApiKey — JWT verify + role + API key checks
 │   │       ├── routes/
@@ -100,7 +100,7 @@ pulseos/                          # Monorepo root
 │  cpu.ts         mem.ts          net.ts       processes.ts   │
 │       ↓              ↓               ↓              ↓       │
 │  ┌────────────────────────────────────────────────────┐     │
-│  │              collectAll()  (every 5s)              │     │
+│  │         collectAll()  (every 5s, 9 parallel ops)   │     │
 │  │         Promise.allSettled — graceful fallbacks    │     │
 │  └──────────────────────┬─────────────────────────────┘     │
 │                         │                                   │
@@ -172,6 +172,16 @@ Client POST /api/docker/:id/restart
   → dockerPost('/containers/:id/restart') via Node http.request to unix socket
   → Docker daemon performs action
   → Next WS tick reflects updated container state
+```
+
+### Docker Log Streaming
+```
+Client GET /api/docker/:id/logs?tail=100
+  → requireAuth (viewer+)
+  → httpRequest to Docker socket: /containers/:id/logs?stdout=1&stderr=1&tail=100
+  → Raw multiplexed stream collected as Buffer[]
+  → demuxDockerStream() strips 8-byte Docker frame headers
+  → Clean text returned as { ok: true, data: string[] }
 ```
 
 ---

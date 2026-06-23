@@ -21,7 +21,7 @@ PulseOS is a **lightweight, self-hosted VPS monitoring dashboard** with a planne
 | **Database** | `db/index.ts` | SQLite singleton, schema migration, all query functions |
 | **Auth Routes** | `routes/auth.ts` | Login, first-run setup, `/me` endpoint. JWT contains `{ sub, username, role }`. `last_login_at` updated on login. |
 | **Metrics Routes** | `routes/metrics.ts` | REST endpoints for current snapshot + history query. Alert rule CRUD gated behind `requireAdmin`. |
-| **Docker Routes** | `routes/docker.ts` | Container list, log streaming (viewer+). Start/stop/restart/remove gated behind `requireAdmin`. |
+| **Docker Routes** | `routes/docker.ts` | Container list, log streaming with Docker multiplex demuxing (viewer+). Start/stop/restart/remove gated behind `requireAdmin`. |
 | **Status Route** | `routes/status.ts` | Public unauthenticated status page data |
 | **Team Routes** | `routes/team.ts` | User CRUD (owner-gated), invite generation/revocation (admin-gated), accept-invite (no auth) |
 | **Server Routes** | `routes/servers.ts` | Remote server CRUD (admin-gated), `apiToken` stripped from all responses, polling loop via `startRemotePolling()` |
@@ -81,7 +81,7 @@ Key implementation requirements: `role` column on `users` table, `role` claim in
 
 ### Metrics Collection Loop
 1. `createSocketServer()` calls `startCollection()` on boot
-2. `setInterval(tick, 5000)` → `collectAll()` runs all 7 collectors in parallel
+2. `setInterval(tick, 5000)` → `collectAll()` runs all 9 operations in parallel (7 collectors + hostname + uptime)
 3. Results inserted into `metrics_history` (SQLite WAL)
 4. `evaluateAlerts()` checks all enabled rules against fresh snapshot
 5. If threshold crossed and cooldown elapsed → `fireAlert()` → DB insert + Socket.IO broadcast + Telegram/Discord

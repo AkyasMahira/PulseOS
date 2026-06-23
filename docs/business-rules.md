@@ -125,11 +125,11 @@
 - Invalid actions return HTTP 400.
 
 ### BR-DOCKER-02 — Log Access
-- **Status**: Implemented (with known issue)
+- **Status**: ✅ Implemented (fixed in v1.0.0)
 - Log tail is limited to max 500 lines (enforced server-side).
 - Default tail: 100 lines.
 - Logs include both stdout and stderr (`stdout=1&stderr=1`).
-- Raw Docker multiplexed stream is returned — 8-byte frame headers are not stripped (known issue L-08).
+- Docker multiplexed stream frames (8-byte headers) are stripped server-side via `demuxDockerStream()` — client receives clean text.
 
 ### BR-DOCKER-03 — RBAC on Container Actions
 - **Status**: ✅ Implemented (Phase 3E)
