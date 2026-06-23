@@ -24,7 +24,10 @@
 | V1-06 | Alert cooldown persistence | S | ✅ | Persisted to `alert_rules.last_fired_at` |
 | V1-07 | API key hashing | S | ✅ | sha256 before store, sha256 on compare |
 | V1-08 | Mobile sidebar drawer | S | ✅ | Hamburger toggle with auto-close |
-| V1-09 | Audit log for destructive actions | M | 📋 Deferred to v1.1 | Log container/user mutations |
+| V1-09 | Audit log for destructive actions | M | Deferred to v1.1 | Log container/user mutations |
+| V1-10 | Docker log stream demultiplexing | S | ✅ | Strip 8-byte Docker multiplex frame headers |
+| V1-11 | getDb() race condition fix | S | ✅ | Sync mkdir before new Database() on fresh install |
+| V1-12 | Process CPU first-tick fix | S | ✅ | Skip first tick, return data from second tick onward |
 
 ---
 
@@ -74,11 +77,11 @@
 | R-02 | Warn on default JWT secret | S | ✅ Done — console.warn added in Phase 3A |
 | R-03 | Request body size limit | S | ✅ Done — `bodyLimit: 1_048_576` added in Phase 3A |
 | R-04 | Remove unused dependencies | S | ✅ Done (V1-03) — 6 packages removed |
-| R-05 | Split `db/index.ts` into domain modules | M | File at ~384 lines with 35+ query functions. Splitting becoming urgent. |
+| R-05 | Split `db/index.ts` into domain modules | M | File at ~444 lines with 40+ query functions. Splitting becoming urgent. |
 | R-06 | Use proper `cn()` (clsx + tailwind-merge) | S | Current `cn()` in `lib/utils.ts` is naive string join |
 | R-07 | Collector error telemetry | S | Log collector-specific errors in `collectAll()` |
 | R-08 | Fastify JSON schema on all POST routes | M | ✅ Done (V1-02) — schema.body on all 6 POST endpoints |
-| R-09 | Docker log stream demultiplexing | S | Strip 8-byte Docker multiplexed frame headers |
+| R-09 | Docker log stream demultiplexing | S | ✅ Done (V1-10) — 8-byte Docker multiplex frame headers stripped |
 
 ---
 

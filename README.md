@@ -376,8 +376,8 @@ Designed to stay lightweight on low-resource VPS environments.
 - [x] Team accounts & RBAC (Phase 3)
 - [x] Multi-server management (Phase 3)
 - [x] API keys & webhooks (Phase 3)
-- [ ] Pre-release hardening (7 tasks — see `TODO_AI.md`)
-- [ ] v1.0.0 stable release
+- [x] Pre-release hardening (7 tasks — see `TODO_AI.md`)
+- [x] v1.0.0 stable release
 - [ ] Billing & subscription system (Phase 4)
 - [ ] Email alert channel
 - [ ] Password reset flow
@@ -390,8 +390,6 @@ Designed to stay lightweight on low-resource VPS environments.
 2. **Single-node SQLite**: No horizontal scaling. WAL mode handles concurrent reads
 3. **JWT role staleness**: Role changes require re-login (7-day JWT expiry)
 4. **No test suite**: Zero tests across the codebase
-5. **API keys stored as plaintext**: `key_hash` column is the raw key (not hashed)
-6. **Alert cooldowns in-memory**: Lost on API restart (cooldowns reset to zero)
 
 See `CHANGELOG_AI.md` and `AUDIT_LOG.md` for full details.
 
