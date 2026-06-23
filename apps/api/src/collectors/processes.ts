@@ -55,18 +55,22 @@ export async function collectProcesses(limit = 20): Promise<ProcessInfo[]> {
     const statRaw = await readFile('/proc/stat', 'utf8')
     const cpuLine = statRaw.split('\n')[0].split(/\s+/).slice(1).map(Number)
     const sysTime = cpuLine.reduce((a, b) => a + b, 0)
+    const isFirstTick = prevSysTime === 0
     const sysElapsed = sysTime - prevSysTime
+    prevSysTime = sysTime
 
-    const processes = await Promise.allSettled(
+    const stats = await Promise.allSettled(
       pids.map(async (pid) => {
-        const [stat, cmdline, mem] = await Promise.all([
-          readProcStat(pid),
-          readProcCmdline(pid),
-          readProcMemRss(pid),
-        ])
+        const stat = await readProcStat(pid)
         if (!stat) return null
 
         const procTime = stat.utime + stat.stime
+
+        if (isFirstTick) {
+          prevProcTimes.set(stat.pid, procTime)
+          return null
+        }
+
         const prevTime = prevProcTimes.get(stat.pid) ?? procTime
         const cpuTicks = procTime - prevTime
         const cpuPercent = sysElapsed > 0
@@ -74,6 +78,11 @@ export async function collectProcesses(limit = 20): Promise<ProcessInfo[]> {
           : 0
 
         prevProcTimes.set(stat.pid, procTime)
+
+        const [cmdline, mem] = await Promise.all([
+          readProcCmdline(pid),
+          readProcMemRss(pid),
+        ])
 
         return {
           pid: stat.pid,
@@ -86,9 +95,7 @@ export async function collectProcesses(limit = 20): Promise<ProcessInfo[]> {
       })
     )
 
-    prevSysTime = sysTime
-
-    return processes
+    return stats
       .filter((r): r is PromiseFulfilledResult<ProcessInfo | null> => r.status === 'fulfilled')
       .map(r => r.value)
       .filter((p): p is ProcessInfo => p !== null && p.mem > 0)

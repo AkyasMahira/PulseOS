@@ -1,5 +1,4 @@
 import 'dotenv/config'
-import { createServer } from 'http'
 import Fastify from 'fastify'
 import FastifyCors from '@fastify/cors'
 import FastifyJwt from '@fastify/jwt'
@@ -71,9 +70,7 @@ async function bootstrap() {
   // Health check
   app.get('/health', async () => ({ ok: true, ts: Date.now() }))
 
-  // Build Node HTTP server so Socket.IO can share it
-  const httpServer = createServer(app.server)
-  // Socket.IO attaches to existing server
+  // Socket.IO attaches to Fastify's underlying HTTP server
   createSocketServer(app.server as any, JWT_SECRET)
 
   startRemotePolling(parseInt(process.env.COLLECT_INTERVAL_MS ?? '5000'))

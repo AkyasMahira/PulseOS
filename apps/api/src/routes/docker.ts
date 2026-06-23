@@ -32,6 +32,19 @@ function dockerDelete(path: string): Promise<number> {
   })
 }
 
+function demuxDockerStream(buffer: Buffer): string {
+  const parts: string[] = []
+  let offset = 0
+  while (offset + 8 <= buffer.length) {
+    const size = buffer.readUInt32BE(offset + 4)
+    offset += 8
+    if (offset + size > buffer.length) break
+    parts.push(buffer.subarray(offset, offset + size).toString('utf8'))
+    offset += size
+  }
+  return parts.join('')
+}
+
 export async function dockerRoutes(app: FastifyInstance) {
   // GET /api/docker
   app.get('/', { preHandler: requireAuth }, async () => {
@@ -89,12 +102,15 @@ export async function dockerRoutes(app: FastifyInstance) {
       const tail = Math.min(parseInt(req.query.tail ?? '100'), 500)
 
       return new Promise((resolve) => {
-        let data = ''
+        const chunks: Buffer[] = []
         const r = httpRequest(
           { socketPath: SOCKET, path: `/containers/${id}/logs?stdout=1&stderr=1&tail=${tail}&timestamps=1`, method: 'GET', headers: { Host: 'localhost' } },
           (res) => {
-            res.on('data', chunk => { data += chunk })
-            res.on('end', () => resolve({ ok: true, data: data.split('\n').filter(Boolean) }))
+            res.on('data', (chunk: Buffer) => { chunks.push(chunk) })
+            res.on('end', () => {
+              const text = demuxDockerStream(Buffer.concat(chunks))
+              resolve({ ok: true, data: text.split('\n').filter(Boolean) })
+            })
           }
         )
         r.on('error', (e) => resolve({ ok: false, error: String(e) }))
