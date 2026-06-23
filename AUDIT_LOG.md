@@ -149,9 +149,9 @@
 - **Evidence**: Removed from dependencies.
 
 ### L-06 — Process CPU Calculation on First Tick Is Zero
-- **Status**: Pending (known limitation)
+- **Status**: ✅ Fixed (V1-12)
 - **File**: `apps/api/src/collectors/processes.ts`
-- **Risk**: On the first collection tick, `prevProcTimes` is empty, so all processes show 0% CPU. Resolves on second tick.
+- **Evidence**: On first tick, `prevSysTime === 0` triggers baseline-only mode — PID times are stored in `prevProcTimes` but no process results are returned. From the second tick onward, CPU deltas are computed against stored baseline and results are returned.
 
 ### L-07 — `collectPm2` Silently Fails if PM2 Not Installed
 - **Status**: Fixed (via try/catch)
@@ -159,7 +159,6 @@
 - **Evidence**: Wrapped in try/catch returning `[]`.
 
 ### L-08 — Docker Logs Return Raw Multiplexed Stream
-- **Status**: Pending
-- **File**: `apps/api/src/routes/docker.ts:91-102`
-- **Risk**: Docker log stream uses multiplexed framing (8-byte header). Raw bytes will appear in log output for binary content.
-- **Fix**: Implement Docker stream demultiplexer (strip 8-byte headers).
+- **Status**: ✅ Fixed (V1-1.0.0)
+- **File**: `apps/api/src/routes/docker.ts:35-53`
+- **Evidence**: `demuxDockerStream()` parses Docker's 8-byte multiplex framing header (1-byte stream type + 3 padding + 4-byte big-endian size), extracts each frame's payload, and returns UTF-8 text. Log handler now collects chunks as `Buffer[]`, concatenates, demuxes, then splits by newline.

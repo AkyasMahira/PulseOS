@@ -109,7 +109,7 @@
 
 ## v1 Release Sprint ✅ Complete
 
-**7 critical fixes applied:**
+**12 fixes applied (V1-01 to V1-12):**
 - V1-01: JWT secret — `process.exit(1)` in production if default
 - V1-02: Input validation — Fastify JSON schema on all POST routes (team, servers, apikeys)
 - V1-03: Removed 6 unused dependencies (`node-telegram-bot-api`, `@fastify/websocket`, `clsx`, `tailwind-merge`, `@radix-ui/*`)
@@ -117,6 +117,11 @@
 - V1-05: Disk history writes — `insertDiskHistory()` called in WS tick loop
 - V1-06: Alert cooldown persistence — persisted to `alert_rules.last_fired_at`, survives restart
 - V1-07: API key hashing — sha256 before storage, sha256 comparison in `requireApiKey`
+- V1-08: Mobile sidebar — hamburger drawer with auto-close on nav click
+- V1-09: Audit log for destructive actions — deferred to v1.1
+- V1-10: Docker log stream demultiplexing — strip 8-byte multiplex frame headers (L-08)
+- V1-11: getDb() race condition — sync `mkdir` before `new Database()` on fresh install
+- V1-12: Process CPU first-tick fix — skip baseline tick, return data from second tick onward (L-06)
 
 **Additional features:**
 - V1-08: Mobile sidebar — hamburger drawer with auto-close on nav click
@@ -141,6 +146,10 @@
 | Stale env reference | SettingsPage referenced deleted `apps/api/.env`. Updated to `.env` (root directory). | `SettingsPage.tsx:76` | — |
 | DB settings not read | `settings` table was written by UI form but never read by backend. `alerts.ts` and `status.ts` now call `getSetting()` first, falling back to `process.env`. | `alerts.ts:15-17`, `status.ts:49-50` | — |
 | Astro env not loading on VPS | Vite `process.env.PUBLIC_API_URL` sometimes failed to read `apps/web/.env` in npm workspaces context. Fixed by using Vite's `loadEnv()` in `astro.config.mjs` to explicitly read from `apps/web/` directory. | `astro.config.mjs:2-4` | — |
+| getDb() race condition | On fresh install, `import('fs').then(fs => fs.mkdirSync(...))` ran asynchronously before `new Database(DB_PATH)`, causing crash if `data/` directory didn't exist. Fixed with sync `fs.existsSync` + `fs.mkdirSync` before DB creation. | `db/index.ts:14-23` | v1.0.0 |
+| Docker log raw framing | Docker logs returned raw multiplexed stream with 8-byte frame headers, producing garbage characters in output. Fixed by adding `demuxDockerStream()` that strips Docker multiplex frame headers and extracts clean text. | `routes/docker.ts:35-43` | v1.0.0 |
+| Process CPU zero on first tick | On first collection tick, `prevProcTimes` was empty, so `prevTime` defaulted to `procTime`, making all CPU deltas 0. Fixed by skipping the first (baseline) tick and returning process data only from the second tick onward. | `collectors/processes.ts:50-100` | v1.0.0 |
+| Dead HTTP server code | `createServer(app.server)` created an unused HTTP server on startup. Removed import and dead variable; Socket.IO attaches directly to `app.server` via `as any` cast. | `index.ts:2,74-77` | v1.0.0 |
 
 ## Refactored Config
 
@@ -194,3 +203,4 @@
 8. **ALTER TABLE idempotency**: ✅ Fixed — ALTER TABLE statements now wrapped in try/catch.
 9. **API key hashing**: ✅ Fixed (V1-07) — keys hashed with sha256 before storage.
 10. **Webhook secrets auto-generated**: `createWebhook()` generates a 24-char secret but no HMAC signature is computed on outgoing payloads. The `X-Webhook-Secret` header is sent for consumer-side verification only.
+11. **Process CPU first-tick**: ✅ Fixed (V1-12) — baseline tick skipped, data returned from second tick onward, but process list is empty for the first 5 seconds after boot.

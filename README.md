@@ -134,7 +134,7 @@ npm install
 
 cp .env.example .env
 nano .env                    # set JWT_SECRET, ADMIN_USER, ADMIN_PASS
-
+comm
 echo "PUBLIC_API_URL=http://localhost:3001" > apps/web/.env
 
 npm run dev

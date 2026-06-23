@@ -193,3 +193,39 @@
 **Evidence**: `db/index.ts:121-128` — Three ALTER TABLE statements for `role`, `email`, `last_login_at` run in a `for` loop with individual try/catch. First boot: columns added. Subsequent boots: `SQLITE_ERROR` caught, process continues.
 
 **Impact**: Migration errors on truly invalid SQL (syntax errors, missing tables) are still silently swallowed. Acceptable for a single-file migration with known column additions. If more complex migrations are needed in the future, a proper migration framework should be used.
+
+---
+
+## D-17 — Synchronous File System for Database Initialization (✅ Implemented — v1.0.0)
+
+**Decision**: Use synchronous `fs.existsSync` + `fs.mkdirSync` for creating the database directory, replacing a fire-and-forget async `import('fs').then(fs => fs.mkdirSync(...))` pattern.
+
+**Reason**: The previous pattern ran `mkdir` inside a `.then()` callback — meaning it executed asynchronously after `new Database(DB_PATH)` already tried to open the file. On a fresh VPS where `apps/api/data/` did not yet exist, this race condition crashed the process. Synchronous directory creation guarantees the directory exists before `better-sqlite3` tries to open the database file.
+
+**Evidence**: `db/index.ts:14-23` — `const dir = path.dirname(DB_PATH); if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }) }`.
+
+**Impact**: Adds a synchronous `fs` import to the DB module. The `existsSync` + `mkdirSync` pattern is idempotent and runs only once per process lifetime (guarded by the `if (!db)` singleton check). No measurable performance impact — this runs exactly once at startup.
+
+---
+
+## D-18 — Server-Side Docker Stream Demultiplexing (✅ Implemented — v1.0.0)
+
+**Decision**: Strip Docker's 8-byte multiplex framing headers on the server side before returning log data to the client.
+
+**Reason**: Docker uses a multiplexed protocol when streaming both stdout and stderr simultaneously (`stdout=1&stderr=1`). Each frame has an 8-byte header: 1 byte stream type + 3 padding + 4 bytes big-endian size. Without demuxing, these headers appear as garbage bytes in the text output. Demuxing on the server keeps the client simple and the logs clean.
+
+**Evidence**: `routes/docker.ts:35-43` — `demuxDockerStream(buffer)` iterates the buffer, reads 8-byte headers, extracts frames, and concatenates UTF-8 payloads. Log handler collects `Buffer[]` chunks, concatenates, demuxes, then splits by newline.
+
+**Impact**: Log output is now clean text without binary framing garbage. The demux function handles partial/malformed frames gracefully (breaks out if frame exceeds buffer bounds). Previously the handler used string concatenation (`data += chunk`) which corrupted binary headers into garbled characters — now uses `Buffer[]` + `Buffer.concat()` for correct binary handling.
+
+---
+
+## D-19 — First-Tick Baseline Skip for Process CPU (✅ Implemented — v1.0.0)
+
+**Decision**: Skip returning process data on the first collection tick, use it only to collect baseline CPU times. Return process metrics starting from the second tick.
+
+**Reason**: Process CPU calculation requires a prior `utime + stime` baseline per PID. On the first tick, no baseline exists, so CPU deltas were all zero — giving the false impression that all processes are idle. Collecting baselines silently on the first tick and only emitting results from the second tick onward ensures accurate CPU percentages.
+
+**Evidence**: `collectors/processes.ts:58-59` — `const isFirstTick = prevSysTime === 0`. When true, each PID's `procTime` is stored in `prevProcTimes` but `null` is returned for that process entry. The function also defers `cmdline`/`mem` reads to the second tick to avoid unnecessary I/O on the baseline pass.
+
+**Impact**: Process list is empty for the first 5 seconds after API boot (one collection interval). From the second tick onward, all CPU values are accurate delta calculations. The `isFirstTick` check also optimizes the baseline tick by skipping `cmdline` and `mem` reads. Acceptable tradeoff — the brief empty window is preferable to showing misleading 0% CPU values.
